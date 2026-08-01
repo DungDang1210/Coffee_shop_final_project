@@ -1,0 +1,25 @@
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #f5f1ea;
+}
+
+/* Container */
+.container {
+  padding: 40px;
+  max-width: 1200px;
+  margin: auto;
+}
+
+/* Title */
+.title {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+/* Grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}

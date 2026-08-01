@@ -9,37 +9,52 @@ require("dotenv").config();
 
 const mongoose = require("mongoose");
 
-const Product =
-  require("./models/Product");
+const Product = require("./models/Product");
+const products = require("./data/products.json");
 
-const products =
-  require("./data/products.json");
+const Promotion = require("./models/Promotion");
+const promotions = require("./data/promotions.json");
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("MongoDB connected");
-  });
+const Recipe = require("./models/Recipe");
+const recipes = require("./data/recipes.json");
 
-const importData = async () => {
+const Inventory = require("./models/Inventory");
+const inventory = require("./data/inventory.json");
+
+async function runSeeder() {
 
   try {
 
-    await Product.deleteMany();
+    console.log(process.env.MONGO_URI);
 
+    await mongoose.connect(process.env.MONGO_URI);
+
+    console.log("MongoDB Connected");
+
+    await Product.deleteMany();
     await Product.insertMany(products);
 
-    console.log("Products Imported!");
+    await Promotion.deleteMany();
+    await Promotion.insertMany(promotions);
 
-    process.exit();
+    await Recipe.deleteMany();
+    await Recipe.insertMany(recipes);
+
+    await Inventory.deleteMany();
+    await Inventory.insertMany(inventory);
+
+    console.log("All Data Imported!");
+
+    process.exit(0);
 
   } catch (err) {
 
-    console.log(err);
+    console.error(err);
 
     process.exit(1);
 
   }
 
-};
+}
 
-importData();
+runSeeder();

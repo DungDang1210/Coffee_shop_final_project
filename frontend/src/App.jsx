@@ -2,32 +2,32 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import { useState, useEffect } from "react";
 
-import Home from "./pages/Home";
-import Cart from "./pages/Cart";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import ProductDetail from "./pages/ProductDetail";
-import Favorites from "./pages/Favorites";
-import Checkout from "./pages/Checkout";
-import Success from "./pages/Success";
-import OrderHistory from "./pages/OrderHistory";
-import Promotions from "./pages/Promotions";
+import Home from "./pages/customer/Home";
+import Cart from "./pages/customer/Cart";
+import Login from "./pages/customer/Login";
+import Register from "./pages/customer/Register";
+import ProductDetail from "./pages/customer/ProductDetail";
+import Favorites from "./pages/customer/Favorites";
+import Checkout from "./pages/customer/Checkout";
+import Success from "./pages/customer/Success";
+import OrderHistory from "./pages/customer/OrderHistory";
+import Promotions from "./pages/customer/Promotions";
 
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import MenuManagement from "./pages/admin/MenuManagement";
 import OrderManagement from "./pages/admin/OrderManagement";
 import Reports from "./pages/admin/Reports";
 import Supplies from "./pages/admin/Supplies";
-import Payments from "./pages/admin/Payments";
 import AdminHome from "./pages/admin/AdminHome";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminProtectedRoute from "./pages/admin/AdminProtectedRoute";
+import StockHistory from "./pages/admin/inventory/components/StockHistory";
 
-import Toast from "./components/Toast";
-import Menu from "./pages/Menu";
-import AIChatbot from "./components/AIChatBot";
+import Toast from "./components/common/Toast";
+import Menu from "./pages/customer/Menu";
+import AIChatbot from "./components/ai/AIChatBot";
 
-import Profile from "./pages/Profile";
+import Profile from "./pages/customer/Profile";
 
 export default function App() {
 
@@ -71,7 +71,6 @@ export default function App() {
   const [toast, setToast] =
     useState("");
 
-
   /* =========================
      TOAST
   ========================= */
@@ -91,28 +90,61 @@ export default function App() {
      FETCH PRODUCTS
   ========================= */
 
+  const fetchProducts = async () => {
+
+      try {
+
+          const response = await fetch(
+              "http://localhost:5000/api/products"
+          );
+
+
+          if(!response.ok){
+              throw new Error("Cannot fetch products");
+          }
+
+
+          const data = await response.json();
+
+
+          setProducts(data);
+
+
+      } catch(err){
+
+          console.log(err);
+
+      }
+
+  };
+
   useEffect(() => {
 
-    fetch(
-      "http://localhost:5000/api/products"
-    )
-      .then((res) => res.json())
+      const loadProducts = async()=>{
 
-      .then((data) => {
+          try{
 
-        setProducts(data);
+              await fetchProducts();
 
-        setLoading(false);
+          }
 
-      })
+          catch(err){
 
-      .catch((err) => {
+              console.log(err);
 
-        console.log(err);
+          }
 
-        setLoading(false);
+          finally{
 
-      });
+              setLoading(false);
+
+          }
+
+      };
+
+
+      loadProducts();
+
 
   }, []);
 
@@ -135,6 +167,10 @@ export default function App() {
         await fetch(
           "http://localhost:5000/api/orders"
         );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch orders");
+      }
 
       const data =
         await response.json();
@@ -300,9 +336,13 @@ export default function App() {
           path="/product/:id"
           element={
             <ProductDetail
-              products={products}
-              cart={cart}
-              setCart={setCart}
+                products={products}
+                cart={cart}
+                setCart={setCart}
+                favorites={favorites}
+                setFavorites={setFavorites}
+                user={user}
+                showToast={showToast}
             />
           }
         />
@@ -312,6 +352,7 @@ export default function App() {
           path="/favorites"
           element={
             <Favorites
+              products={products}
               favorites={favorites}
               cart={cart}
               setCart={setCart}
@@ -329,6 +370,9 @@ export default function App() {
             <Promotions
               products={products}
               cart={cart}
+              setCart={setCart}
+              favorites={favorites}
+              setFavorites={setFavorites}
               user={user}
               setUser={setUser}
               showToast={showToast}
@@ -362,9 +406,11 @@ export default function App() {
           element={
             <OrderHistory
               orders={orders}
+              setOrders={setOrders}
               cart={cart}
               setCart={setCart}
               showToast={showToast}
+              user={user}
             />
           }
         />
@@ -377,6 +423,7 @@ export default function App() {
               user={user}
               setUser={setUser}
               cart={cart}
+              orders={orders}
             />
           }
         />
@@ -431,6 +478,7 @@ export default function App() {
               <MenuManagement
                 products={products}
                 setProducts={setProducts}
+                fetchProducts={fetchProducts}
               />
             }
           />
@@ -460,29 +508,26 @@ export default function App() {
           <Route
             path="supplies"
             element={
-              <Supplies
-                products={products}
-                setProducts={setProducts}
-              />
+              <Supplies/>
             }
           />
 
-          {/* PAYMENTS */}
+          {/* STOCK HISTORY */}
           <Route
-            path="payments"
-            element={
-              <Payments
-                orders={orders}
-                setOrders={setOrders}
-              />
-            }
+              path="stock-history"
+              element={
+                  <StockHistory />
+              }
           />
 
         </Route>
 
       </Routes>
 
-      <AIChatbot products={products} />
+      <AIChatbot 
+      products={products}
+      cart={cart}
+      />
 
       <Toast message={toast} />
 

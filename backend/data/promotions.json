@@ -1,0 +1,38 @@
+[
+  {
+    "title": "Free Shipping",
+    "type": "FREESHIP",
+    "code": "FREESHIP",
+    "discount": 0,
+    "description": "Free shipping for orders above 100.000đ",
+    "active": true,
+    "banner": "/images/freeship.jpg"
+  },
+  {
+    "title": "Happy Hour",
+    "type": "FLASHSALE",
+    "code": "HAPPY2PM",
+    "discount": 15,
+    "description": "15% OFF from 2PM - 4PM",
+    "active": true,
+    "banner": "/images/happyhour.jpg"
+  },
+  {
+    "title": "Buy 5 Get 1 Free",
+    "type": "BUY5GET1",
+    "code": "BUY5GET1",
+    "discount": 0,
+    "description": "Buy 5 drinks get 1 free",
+    "active": true,
+    "banner": "/images/buy5get1.jpg"
+  },
+  {
+    "title": "Eco Reward",
+    "type": "ECO",
+    "code": "ECO5000",
+    "discount": 0,
+    "description": "Bring your own tumbler save 5.000đ",
+    "active": true,
+    "banner": "/images/eco.jpg"
+  }
+]

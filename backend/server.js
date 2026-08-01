@@ -16,6 +16,12 @@ const aiRoutes = require("./routes/aiRoutes");
 const authRoutes = require("./routes/authRoutes");
 const productRoutes = require("./routes/productRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const path = require("path");
+const uploadRoutes = require("./routes/uploadRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
+const promotionRoutes = require("./routes/promotionRoutes");
+const inventoryRoutes = require("./routes/inventoryRoutes");
+const historyRoutes = require("./routes/historyRoutes");
 
 const app = express();
 
@@ -40,6 +46,18 @@ app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 
 app.use("/api/admin", adminRoutes);
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+app.use("/api/upload", uploadRoutes);
+
+app.use("/api/payment", paymentRoutes);
+
+app.use("/api/promotions", promotionRoutes);
+
+app.use("/api/inventory", inventoryRoutes);
+
+app.use("/api/history", historyRoutes);
 
 // ======================
 // DATABASE

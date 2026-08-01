@@ -1,0 +1,97 @@
+[
+  {
+    "productName":"Cà Phê Sữa Đá",
+
+    "ingredients":[
+
+      {
+        "ingredientName":"Coffee Bean",
+
+        "quantity":20,
+
+        "unit":"g"
+      },
+
+      {
+        "ingredientName":"Condensed Milk",
+
+        "quantity":30,
+
+        "unit":"ml"
+      },
+
+      {
+        "ingredientName":"Ice",
+
+        "quantity":200,
+
+        "unit":"g"
+      }
+
+    ]
+  },
+
+  {
+    "productName":"Bạc Xỉu",
+
+    "ingredients":[
+
+      {
+        "ingredientName":"Coffee Bean",
+
+        "quantity":10,
+
+        "unit":"g"
+      },
+
+      {
+        "ingredientName":"Fresh Milk",
+
+        "quantity":100,
+
+        "unit":"ml"
+      },
+
+      {
+        "ingredientName":"Condensed Milk",
+
+        "quantity":40,
+
+        "unit":"ml"
+      }
+
+    ]
+  },
+
+  {
+    "productName":"Trà Đào Cam Sả",
+
+    "ingredients":[
+
+      {
+        "ingredientName":"Peach Syrup",
+
+        "quantity":50,
+
+        "unit":"ml"
+      },
+
+      {
+        "ingredientName":"Orange",
+
+        "quantity":1,
+
+        "unit":"slice"
+      },
+
+      {
+        "ingredientName":"Lemongrass",
+
+        "quantity":10,
+
+        "unit":"g"
+      }
+
+    ]
+  }
+]

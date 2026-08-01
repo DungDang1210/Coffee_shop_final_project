@@ -1,77 +1,92 @@
 const mongoose = require("mongoose");
 
-const productSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true
+const productSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true
+    },
+
+    price: {
+      type: Number,
+      required: true
+    },
+
+    image: {
+      type: String,
+      default: ""
+    },
+
+    description: {
+      type: String,
+      default: ""
+    },
+
+    category: {
+      type: String,
+      required: true
+    },
+
+    subcategory: {
+      type: String,
+      default: ""
+    },
+
+    bestSeller: {
+      type: Boolean,
+      default: false
+    },
+
+    signature: {
+      type: Boolean,
+      default: false
+    },
+
+    seasonal: {
+      type: Boolean,
+      default: false
+    },
+
+    available: {
+      type: Boolean,
+      default: true
+    },
+
+    // ===== AI Recommendation =====
+
+    taste: {
+      type: String,
+      default: ""
+    },
+
+    temperature: {
+      type: String,
+      enum: ["Hot", "Cold", "Warm"],
+      default: "Cold"
+    },
+
+    milk: {
+      type: Boolean,
+      default: false
+    },
+
+    caffeine: {
+      type: Number,
+      default: 0
+    },
+
+    intensity: {
+      type: Number,
+      default: 1
+    }
+
   },
-
-  price: {
-    type: Number,
-    required: true
-  },
-
-  image: {
-    type: String,
-    required: true
-  },
-
-  description: {
-    type: String,
-    required: true
-  },
-
-  category: {
-    type: String,
-
-    enum: [
-      "Signature",
-
-      "Coffee",
-      "Tea",
-      "Smoothie",
-      "Juice",
-      "Soda",
-      "Dessert Drink",
-
-      "Sweet",
-      "Bakery"
-    ],
-
-    required: true
-  },
-
-  subcategory: {
-    type: String,
-    required: true
-  },
-
-  bestSeller: {
-    type: Boolean,
-    default: false
-  },
-
-  signature: {
-    type: Boolean,
-    default: false
-  },
-
-  seasonal: {
-    type: Boolean,
-    default: false
-  },
-
-  available: {
-    type: Boolean,
-    default: true
+  {
+    timestamps: true
   }
+);
 
-}, {
-  timestamps: true
-});
-
-module.exports =
-  mongoose.model(
-    "Product",
-    productSchema
-  );
+module.exports = mongoose.model(
+  "Product",
+  productSchema
+);

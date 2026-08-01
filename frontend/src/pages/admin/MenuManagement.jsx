@@ -1,158 +1,166 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+import ProductTable from "./menu/components/ProductTable";
+import ProductToolbar from "./menu/components/ProductToolbar";
+import ProductStats from "./menu/components/ProductStats";
+import ProductModal from "./menu/components/ProductModal";
+import ExcelImport from "./menu/components/ExcelImport";
+import DeleteModal from "./menu/components/DeleteModal";
+import useProductForm from "./menu/hooks/useProductForm";
 
 export default function MenuManagement({
   products,
-  setProducts
+  setProducts,
+  fetchProducts
 }) {
 
-  const [form, setForm] = useState({
-    name: "",
-    price: "",
-    image: "",
-    description: "",
-    category: "Coffee",
-    subcategory: ""
+  const {
+
+      form,
+
+      setForm,
+
+      editingId,
+
+      setEditingId,
+
+      saveProduct,
+
+      editProduct,
+
+      emptyForm
+
+  } = useProductForm(setProducts, fetchProducts);
+
+  useEffect(() => {
+      fetchProducts();
+  }, []);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const [deleteItem, setDeleteItem] = useState(null);
+
+  const [excelOpen,setExcelOpen]=useState(false);
+
+  const [modalOpen,setModalOpen]=useState(false);
+
+  const [search,setSearch]=useState("");
+
+  const handleSearch = (value)=>{
+
+        setSearch(value);
+        setCurrentPage(1);
+
+    };
+
+  const [category,setCategory]=useState("All");
+
+  const [currentPage,setCurrentPage] = useState(1);
+
+  const itemsPerPage = 5;
+
+  const filteredProducts = products.filter(product=>{
+
+      const matchSearch=
+
+          product.name
+          .toLowerCase()
+          .includes(
+              search.toLowerCase()
+          );
+
+      const matchCategory=
+
+          category==="All" ||
+
+          product.category===category;
+
+      return matchSearch && matchCategory;
+
   });
-
-  const [editingId, setEditingId] =
-    useState(null);
-
-
-  // ======================
-  // REFRESH PRODUCTS
-  // ======================
-  const fetchProducts = async () => {
-    try {
-
-      const response = await fetch(
-        "http://localhost:5000/api/products"
-      );
-
-      const data =
-        await response.json();
-
-      setProducts(data);
-
-    } catch (err) {
-      console.log(err);
-    }
-  };
+  const totalPages = Math.ceil(
+    filteredProducts.length / itemsPerPage
+    );
 
 
-  // ======================
-  // ADD / UPDATE
-  // ======================
-  const handleSubmit = async () => {
+    const paginatedProducts = filteredProducts.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
 
-    if (!form.name || !form.price) {
-      return;
-    }
+  const handleImport = async (rows) => {
 
-    try {
+      try{
 
-      // ======================
-      // UPDATE
-      // ======================
-      if (editingId) {
+          for(const product of rows){
 
-        await fetch(
-          `http://localhost:5000/api/products/${editingId}`,
-          {
-            method: "PUT",
+              await fetch(
 
-            headers: {
-              "Content-Type":
-                "application/json"
-            },
+                  "http://localhost:5000/api/products",
 
-            body: JSON.stringify({
-              ...form,
-              price: Number(form.price)
-            })
+                  {
+
+                      method:"POST",
+
+                      headers:{
+                          "Content-Type":"application/json"
+                      },
+
+                      body:JSON.stringify(product)
+
+                  }
+
+              );
+
           }
-        );
 
-        setEditingId(null);
+          fetchProducts();
 
-      } else {
+          setExcelOpen(false);
 
-        // ======================
-        // CREATE
-        // ======================
-        await fetch(
-          "http://localhost:5000/api/products",
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json"
-            },
-
-            body: JSON.stringify({
-              ...form,
-              price: Number(form.price)
-            })
-          }
-        );
       }
 
-      // refresh DB products
-      fetchProducts();
+      catch(err){
 
-      // reset form
-      setForm({
-        name: "",
-        price: "",
-        image: "",
-        description: "",
-        category: "Coffee",
-        subcategory: ""
-      });
+          console.log(err);
 
-    } catch (err) {
-      console.log(err);
-    }
+      }
+
   };
-
-
-  // ======================
-  // EDIT
-  // ======================
-  const handleEdit = (product) => {
-
-    setForm({
-      name: product.name,
-      price: product.price,
-      image: product.image,
-      description: product.description,
-      category: product.category,
-      subcategory: product.subcategory
-    });
-
-    setEditingId(product._id);
-  };
-
 
   // ======================
   // DELETE
   // ======================
-  const handleDelete = async (id) => {
+  const confirmDelete = async (id) => {
 
-    try {
+      try {
 
-      await fetch(
-        `http://localhost:5000/api/products/${id}`,
-        {
-          method: "DELETE"
-        }
-      );
+          await fetch(
 
-      fetchProducts();
+              `http://localhost:5000/api/products/${id}`,
 
-    } catch (err) {
-      console.log(err);
-    }
+              {
+
+                  method: "DELETE"
+
+              }
+
+          );
+
+          fetchProducts();
+
+          setDeleteOpen(false);
+
+          setDeleteItem(null);
+
+      }
+
+      catch (err) {
+
+          console.log(err);
+
+      }
+
   };
 
 
@@ -163,181 +171,210 @@ export default function MenuManagement({
         Menu Management
       </h1>
 
+      <ProductStats
 
-      {/* ======================
-          FORM
-      ====================== */}
-      <div className="bg-white p-6 rounded-xl shadow mb-10">
+          products={products}
 
-        <h2 className="text-xl font-bold mb-4">
-          {editingId
-            ? "Edit Product"
-            : "Add Product"}
-        </h2>
+      />
 
-        <div className="grid md:grid-cols-2 gap-4">
+      <ProductToolbar
 
-          <input
-            type="text"
-            placeholder="Product Name"
-            value={form.name}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                name: e.target.value
-              })
+            search={search}
+            setSearch={handleSearch}
+
+            category={category}
+            setCategory={setCategory}
+
+            onImport={()=>setExcelOpen(true)}
+
+            onAdd={()=>{
+
+                setEditingId(null);
+
+                setForm(emptyForm);
+
+                setModalOpen(true);
+
+            }}
+
+        />
+
+        <ProductTable
+
+            products={paginatedProducts}
+
+            onEdit={(product)=>{
+
+                editProduct(product);
+
+                setModalOpen(true);
+
+            }}
+
+            onDelete={(product)=>{
+
+              setDeleteItem(product);
+
+              setDeleteOpen(true); 
+
+            }}
+
+        />
+
+        <div className="flex justify-center items-center mt-8 gap-2">
+
+
+            <button
+
+                onClick={()=>setCurrentPage(prev=>prev-1)}
+
+                disabled={currentPage===1}
+
+                className="
+                w-10
+                h-10
+                rounded-xl
+                border
+                bg-white
+                hover:bg-gray-100
+                disabled:opacity-40
+                "
+
+            >
+
+                ←
+
+            </button>
+
+
+
+            {
+                Array.from(
+                    {
+                        length: totalPages
+                    },
+                    (_,index)=>index+1
+                )
+                .map(page=>(
+
+                    <button
+
+                        key={page}
+
+                        onClick={()=>setCurrentPage(page)}
+
+                        className={`
+                        
+                        w-10
+                        h-10
+                        rounded-xl
+                        font-semibold
+                        transition
+
+                        ${
+                            currentPage===page
+
+                            ?
+
+                            "bg-[#6b4f4f] text-white"
+
+                            :
+
+                            "bg-white border hover:bg-[#f5eee8]"
+
+                        }
+
+                        `}
+
+                    >
+
+                        {page}
+
+                    </button>
+
+                ))
             }
-            className="border p-3 rounded"
-          />
 
-          <input
-            type="number"
-            placeholder="Price"
-            value={form.price}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                price: e.target.value
-              })
-            }
-            className="border p-3 rounded"
-          />
 
-          <input
-            type="text"
-            placeholder="Image"
-            value={form.image}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                image: e.target.value
-              })
-            }
-            className="border p-3 rounded"
-          />
 
-          <select
-            value={form.category}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                category: e.target.value
-              })
-            }
-            className="border p-3 rounded"
-          >
-            <option>Coffee</option>
-            <option>Tea</option>
-            <option>Smoothie</option>
-            <option>Juice</option>
-            <option>Soda</option>
-            <option>Chocolate</option>
-            <option>Dessert Drink</option>
-          </select>
+            <button
 
-          <input
-            type="text"
-            placeholder="Subcategory"
-            value={form.subcategory}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                subcategory: e.target.value
-              })
-            }
-            className="border p-3 rounded"
-          />
+                onClick={()=>setCurrentPage(prev=>prev+1)}
 
-          <textarea
-            placeholder="Description"
-            value={form.description}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                description:
-                  e.target.value
-              })
-            }
-            className="border p-3 rounded md:col-span-2"
-          />
+                disabled={currentPage===totalPages}
+
+                className="
+                w-10
+                h-10
+                rounded-xl
+                border
+                bg-white
+                hover:bg-gray-100
+                disabled:opacity-40
+                "
+
+            >
+
+                →
+
+            </button>
+
 
         </div>
 
-        <button
-          onClick={handleSubmit}
-          className="mt-4 bg-[#6b4f4f] text-white px-6 py-2 rounded"
-        >
-          {editingId
-            ? "Update Product"
-            : "Add Product"}
-        </button>
+        <ProductModal
 
-      </div>
+            open={modalOpen}
 
+            form={form}
 
-      {/* ======================
-          PRODUCT LIST
-      ====================== */}
-      <div className="space-y-4">
+            setForm={setForm}
 
-        {products.map((product) => (
+            editing={editingId}
 
-          <div
-            key={product._id}
-            className="bg-white p-4 rounded-xl shadow flex justify-between items-center"
-          >
+            onClose={()=>setModalOpen(false)}
 
-            <div className="flex items-center gap-4">
+            onSave={async () => {
 
-              <img
-                src={product.image}
-                alt={product.name}
-                className="w-20 h-20 rounded-lg object-cover"
-              />
+                const success = await saveProduct();
 
-              <div>
-                <h3 className="font-bold">
-                  {product.name}
-                </h3>
+                if(success){
 
-                <p>
-                  ${product.price}
-                </p>
+                    setModalOpen(false);
 
-                <p className="text-sm text-gray-500">
-                  {product.category}
-                </p>
-              </div>
-
-            </div>
-
-            <div className="flex gap-3">
-
-              <button
-                onClick={() =>
-                  handleEdit(product)
                 }
-                className="bg-blue-500 text-white px-4 py-2 rounded"
-              >
-                Edit
-              </button>
 
-              <button
-                onClick={() =>
-                  handleDelete(product._id)
-                }
-                className="bg-red-500 text-white px-4 py-2 rounded"
-              >
-                Delete
-              </button>
+            }}
 
-            </div>
+        />
 
-          </div>
+        <ExcelImport
 
-        ))}
+            open={excelOpen}
 
-      </div>
+            onClose={()=>setExcelOpen(false)}
+
+            onImport={handleImport}
+
+        />
+
+        <DeleteModal
+
+            open={deleteOpen}
+
+            product={deleteItem}
+
+            onClose={() => {
+
+                setDeleteOpen(false);
+
+                setDeleteItem(null);
+
+            }}
+
+            onConfirm={confirmDelete}
+
+        />
 
     </div>
   );

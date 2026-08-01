@@ -5,7 +5,7 @@ export default function AdminProtectedRoute({
   children
 }) {
 
-  if (!admin) {
+  if (!admin || admin.role !== "admin") {
     return <Navigate to="/admin/login" />;
   }
 

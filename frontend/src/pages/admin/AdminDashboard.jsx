@@ -12,15 +12,23 @@ import {
   ClipboardList,
   BarChart3,
   Package,
-  CreditCard,
-  ShieldCheck,
-  Bell
+  Bell,
+  Clock,
+  DollarSign,
+  ShoppingBag,
+  CheckCircle,
+  TrendingUp
 } from "lucide-react";
 
 export default function AdminDashboard({
   orders = []
 }) {
+
   const location = useLocation();
+
+  const isDashboard =
+  location.pathname === "/admin" ||
+  location.pathname === "/admin/dashboard";
 
   const [lastViewedOrderId, setLastViewedOrderId] =
     useState(
@@ -35,6 +43,45 @@ export default function AdminDashboard({
   const newOrderCount = orders.filter(
     (order) => order.id > lastViewedOrderId
   ).length;
+
+  const totalRevenue = orders.reduce(
+    (sum, order) =>
+      sum + Number(order.total || 0),
+    0
+  );
+
+
+  const completedOrders = orders.filter(
+    order => order.status === "Completed"
+  ).length;
+
+
+  const pendingOrders = orders.filter(
+    order => order.status === "Pending"
+  ).length;
+
+
+
+  const todayRevenue = orders
+  .filter(order => {
+
+    if(!order.date) return false;
+
+
+    return (
+      new Date(order.date)
+      .toLocaleDateString()
+      ===
+      new Date()
+      .toLocaleDateString()
+    );
+
+  })
+  .reduce(
+    (sum,order)=>
+    sum + Number(order.total || 0),
+    0
+  );
 
   const markOrdersViewed = () => {
     localStorage.setItem(
@@ -73,9 +120,9 @@ export default function AdminDashboard({
       icon: Package
     },
     {
-      label: "Payments",
-      path: "/admin/payments",
-      icon: CreditCard
+      label:"Stock History",
+      path:"/admin/stock-history",
+      icon:Clock
     }
   ];
 
@@ -187,11 +234,26 @@ export default function AdminDashboard({
       {/* MAIN CONTENT */}
       <main className="flex-1 p-10 overflow-y-auto">
 
-        <div className="bg-white rounded-3xl shadow-sm border border-[#eee] p-8 min-h-[calc(100vh-80px)]">
-          <Outlet context={{ markOrdersViewed }} />
+        <div className="
+          bg-white 
+          rounded-3xl 
+          shadow-sm 
+          border 
+          border-[#eee] 
+          p-8 
+          min-h-[calc(100vh-80px)]
+        ">
+
+          <Outlet 
+            context={{
+              markOrdersViewed
+            }}
+          />
+
         </div>
 
       </main>
-    </div>
+          </div>
+    
   );
 }

@@ -1,22 +1,37 @@
 const mongoose = require("mongoose");
 
-const orderSchema = new mongoose.Schema(
-  {
-    userId: String,
+const orderSchema = new mongoose.Schema({
 
-    items: Array,
+userId:String,
 
-    total: Number,
+items:Array,
 
-    status: {
-      type: String,
-      default: "Pending"
-    }
-  },
-  {
-    timestamps: true
-  }
-);
+subtotal:Number,
+
+discount:Number,
+
+voucherCode:String,
+
+deliveryFee:Number,
+
+tax:Number,
+
+total:Number,
+
+paymentMethod:String,
+
+paymentStatus:String,
+
+customer:Object,
+
+status:{
+type:String,
+default:"Pending"
+}
+
+},{
+timestamps:true
+});
 
 module.exports = mongoose.model(
   "Order",

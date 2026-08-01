@@ -9,7 +9,7 @@ const userSchema = new mongoose.Schema(
 
     phone: {
       type: String,
-      required: true,
+      default:""
     },
 
     email: {
@@ -18,9 +18,14 @@ const userSchema = new mongoose.Schema(
       unique: true
     },
 
+    avatar: {
+        type: String,
+        default: ""
+    },
+
     password: {
       type: String,
-      required: true
+      default:""
     },
 
     role: {
