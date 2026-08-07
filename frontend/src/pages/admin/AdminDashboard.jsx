@@ -4,93 +4,56 @@ import {
   useLocation
 } from "react-router-dom";
 
-import { useState } from "react";
-
 import {
   LayoutDashboard,
   Coffee,
   ClipboardList,
   BarChart3,
   Package,
-  Bell,
-  Clock,
-  DollarSign,
-  ShoppingBag,
-  CheckCircle,
-  TrendingUp
+  RefreshCw
 } from "lucide-react";
 
+import useLiveOrders from "../../hooks/useLiveOrders";
+
 export default function AdminDashboard({
-  orders = []
+  orders = [],
+  setOrders
 }) {
 
   const location = useLocation();
 
-  const isDashboard =
-  location.pathname === "/admin" ||
-  location.pathname === "/admin/dashboard";
+  // who is signed in (set by AdminLogin)
+  const admin = (() => {
 
-  const [lastViewedOrderId, setLastViewedOrderId] =
-    useState(
-      Number(localStorage.getItem("lastViewedOrderId")) || 0
-    );
+    try {
 
-  const latestOrderId =
-    orders.length > 0
-      ? orders[orders.length - 1].id
-      : 0;
+      return JSON.parse(
+        localStorage.getItem("admin")
+      );
 
-  const newOrderCount = orders.filter(
-    (order) => order.id > lastViewedOrderId
-  ).length;
+    } catch {
 
-  const totalRevenue = orders.reduce(
-    (sum, order) =>
-      sum + Number(order.total || 0),
-    0
-  );
+      return null;
 
+    }
 
-  const completedOrders = orders.filter(
-    order => order.status === "Completed"
-  ).length;
+  })();
 
+  // polls /api/orders, so a cancel or a reorder made
+  // on the customer side shows up here without a
+  // manual refresh
+  const {
+    newOrders,
+    newOrderCount,
+    cancelledOrders,
+    pendingOrders,
+    refreshing,
+    lastSyncedAt,
+    refresh,
+    markSeen
+  } = useLiveOrders(orders, setOrders);
 
-  const pendingOrders = orders.filter(
-    order => order.status === "Pending"
-  ).length;
-
-
-
-  const todayRevenue = orders
-  .filter(order => {
-
-    if(!order.date) return false;
-
-
-    return (
-      new Date(order.date)
-      .toLocaleDateString()
-      ===
-      new Date()
-      .toLocaleDateString()
-    );
-
-  })
-  .reduce(
-    (sum,order)=>
-    sum + Number(order.total || 0),
-    0
-  );
-
-  const markOrdersViewed = () => {
-    localStorage.setItem(
-      "lastViewedOrderId",
-      latestOrderId
-    );
-
-    setLastViewedOrderId(latestOrderId);
-  };
+  const markOrdersViewed = markSeen;
 
   const navItems = [
     {
@@ -115,14 +78,9 @@ export default function AdminDashboard({
       icon: BarChart3
     },
     {
-      label: "Supplies",
-      path: "/admin/supplies",
+      label: "Inventory",
+      path: "/admin/inventory",
       icon: Package
-    },
-    {
-      label:"Stock History",
-      path:"/admin/stock-history",
-      icon:Clock
     }
   ];
 
@@ -143,40 +101,41 @@ export default function AdminDashboard({
           </p>
         </div>
 
-        {/* ADMIN PROFILE CARD */}
-        <div className="bg-white/10 border border-white/10 rounded-2xl p-4 mb-8 backdrop-blur-sm">
-          <div className="flex items-center gap-4">
+        {/* WHO IS SIGNED IN */}
+        <div className="flex items-center gap-3 bg-white/10 border border-white/10 rounded-2xl p-4 mb-4 backdrop-blur-sm">
 
-            {/* Avatar */}
-            <img
-              src="https://i.pravatar.cc/100?img=12"
-              alt="Admin Avatar"
-              className="w-14 h-14 rounded-full object-cover border-2 border-[#c08b5c] shadow-md"
-            />
+          <div className="w-11 h-11 rounded-full bg-[#c08b5c] text-[#2d1e1e] flex items-center justify-center font-black text-lg shrink-0">
+            {
+              (admin?.name || "A")
+                .charAt(0)
+                .toUpperCase()
+            }
+          </div>
 
-            <div className="flex-1">
-              <h4 className="font-semibold text-white">
-                Admin Owner
-              </h4>
+          <div className="min-w-0 flex-1">
 
-              <p className="text-xs text-[#ddd]">
-                Coffee Shop Manager
-              </p>
+            <p className="font-semibold text-white text-sm truncate">
+              {admin?.name || "Admin"}
+            </p>
 
-              {/* ONLINE BADGE */}
-              <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/20 border border-green-400/30">
-                <span className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
-
-                <span className="text-xs font-semibold text-green-300">
-                  Online Now
-                </span>
-              </div>
-            </div>
+            <p className="text-[11px] text-[#d8cfcf] truncate">
+              {admin?.email || "Coffee Shop Manager"}
+            </p>
 
           </div>
+
+          <span
+            title="Online"
+            className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse shrink-0"
+          />
+
         </div>
 
-        {/* NAVIGATION */}
+        {/* NAVIGATION
+            The "Today" snapshot card used to sit here.
+            It duplicated the Dashboard page, which shows
+            the same figures with more room, so the
+            sidebar just repeats itself. */}
         <nav className="space-y-3 flex-1">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -217,16 +176,37 @@ export default function AdminDashboard({
           })}
         </nav>
 
-        {/* FOOTER STATUS */}
+        {/* FOOTER — live sync status.
+            The old "No new notifications" line is
+            gone; the alert now lives in Order
+            Management where it can be acted on. */}
         <div className="mt-8 bg-white/5 rounded-2xl p-4 border border-white/10">
-          <div className="flex items-center gap-3 text-sm">
-            <Bell size={16} className="text-yellow-300" />
-            <span>
-              {newOrderCount > 0
-                ? `${newOrderCount} new orders pending`
-                : "No new notifications"}
+
+          <button
+            onClick={refresh}
+            disabled={refreshing}
+            className="flex items-center gap-3 text-sm w-full text-left hover:text-white transition disabled:opacity-60"
+          >
+
+            <RefreshCw
+              size={16}
+              className={`text-[#d8cfcf] ${
+                refreshing ? "animate-spin" : ""
+              }`}
+            />
+
+            <span className="text-[#d8cfcf]">
+              {
+                refreshing
+                  ? "Syncing orders..."
+                  : lastSyncedAt
+                    ? `Synced ${lastSyncedAt.toLocaleTimeString("vi-VN")}`
+                    : "Sync orders"
+              }
             </span>
-          </div>
+
+          </button>
+
         </div>
 
       </aside>
@@ -244,9 +224,16 @@ export default function AdminDashboard({
           min-h-[calc(100vh-80px)]
         ">
 
-          <Outlet 
+          <Outlet
             context={{
-              markOrdersViewed
+              markOrdersViewed,
+              newOrders,
+              newOrderCount,
+              cancelledOrders,
+              pendingOrders,
+              refreshing,
+              lastSyncedAt,
+              refresh
             }}
           />
 

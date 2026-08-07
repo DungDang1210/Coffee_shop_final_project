@@ -22,6 +22,8 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const promotionRoutes = require("./routes/promotionRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const historyRoutes = require("./routes/historyRoutes");
+const rewardRoutes = require("./routes/rewardRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
 
 const app = express();
 
@@ -31,7 +33,11 @@ const app = express();
 // ======================
 app.use(cors());
   
-app.use(express.json());
+// 2mb, not the 100kb default: some existing
+// users still have a base64 avatar stored on
+// their record, and resending it on a profile
+// save used to fail with a 413
+app.use(express.json({ limit: "2mb" }));
 
 
 // ======================
@@ -59,6 +65,10 @@ app.use("/api/inventory", inventoryRoutes);
 
 app.use("/api/history", historyRoutes);
 
+app.use("/api/rewards", rewardRoutes);
+
+app.use("/api/reviews", reviewRoutes);
+
 // ======================
 // DATABASE
 // ======================
@@ -82,8 +92,7 @@ app.get("/", (req, res) => {
 // ======================
 // SERVER
 // ======================
-const PORT =
-  process.env.PORT || 5000;
+const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(

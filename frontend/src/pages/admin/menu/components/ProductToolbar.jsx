@@ -2,7 +2,7 @@ import {
     Plus,
     Search,
     Upload,
-    Download
+    HelpCircle
 } from "lucide-react";
 
 export default function ProductToolbar({
@@ -13,9 +13,20 @@ export default function ProductToolbar({
     category,
     setCategory,
 
+    // real categories, derived from the products
+    // themselves. The old hard-coded list had
+    // "Food" and "Dessert Drink", which match no
+    // product, while the real "Sweet" and
+    // "Bakery" were missing.
+    categories = [],
+
+    counts = {},
+
     onAdd,
 
-    onImport
+    onImport,
+
+    onGuide
 
 }) {
 
@@ -62,25 +73,23 @@ export default function ProductToolbar({
                         setCategory(e.target.value)
                     }
 
+                    title="Filter by the category saved on each product"
+
                     className="border rounded-xl px-4 py-3"
 
                 >
 
-                    <option>All</option>
+                    <option value="All">
+                        All categories ({counts.All || 0})
+                    </option>
 
-                    <option>Coffee</option>
+                    {categories.map(cat => (
 
-                    <option>Tea</option>
+                        <option key={cat} value={cat}>
+                            {cat} ({counts[cat] || 0})
+                        </option>
 
-                    <option>Juice</option>
-
-                    <option>Smoothie</option>
-
-                    <option>Soda</option>
-
-                    <option>Food</option>
-
-                    <option>Dessert Drink</option>
+                    ))}
 
                 </select>
 
@@ -90,29 +99,34 @@ export default function ProductToolbar({
 
             <div className="flex gap-3">
 
+                {/* how to build the file */}
+                <button
+
+                    onClick={onGuide}
+
+                    title="Excel format guide + template"
+
+                    className="flex items-center gap-2 border border-green-300 text-green-700 px-4 py-3 rounded-xl hover:bg-green-50 transition"
+
+                >
+
+                    <HelpCircle size={18}/>
+
+                    Format guide
+
+                </button>
+
                 <button
 
                     onClick={onImport}
 
-                    className="flex items-center gap-2 border px-5 py-3 rounded-xl hover:bg-gray-50"
+                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-xl font-semibold transition"
 
                 >
 
                     <Upload size={18}/>
 
                     Import Excel
-
-                </button>
-
-                <button
-
-                    className="flex items-center gap-2 border px-5 py-3 rounded-xl hover:bg-gray-50"
-
-                >
-
-                    <Download size={18}/>
-
-                    Export
 
                 </button>
 

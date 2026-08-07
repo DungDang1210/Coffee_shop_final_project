@@ -324,15 +324,42 @@ async function generateRecommendation(
             result.score,
 
 
+        // Built from the parts that actually exist.
+        // The old template glued taste and category
+        // together and produced "Fruity Coffee",
+        // which reads like a product name.
         reason:
+            buildReason({
+                taste: favoriteTaste,
+                category: favoriteCategory,
+                temperature: favoriteTemperature,
+                product: result.product
+            }),
 
-            `
-            AI analyzed your previous orders.
-            You often choose ${favoriteTaste || "popular"}
-            ${favoriteCategory || "drinks"}.
-            This drink has a similar flavor profile
-            and matches your personal preference.
-            `
+
+        // The taste profile is already computed, so the
+        // next best matches come free. PersonalizedAI
+        // shows the top pick; the home page "related"
+        // row shows these instead of a generic
+        // products.slice(0, 3).
+        related:
+            scoredProducts
+                .slice(1, 7)
+                .map(row => ({
+                    product: row.product,
+                    score: row.score
+                })),
+
+
+        // what the profile actually looks like, so the
+        // UI can explain itself
+        profile: {
+            taste: favoriteTaste,
+            category: favoriteCategory,
+            temperature: favoriteTemperature,
+            avgIntensity,
+            avgCaffeine
+        }
 
     };
 
@@ -346,6 +373,75 @@ async function generateRecommendation(
 // =====================================
 // HELPER
 // =====================================
+
+
+// Reads the profile as a sentence a customer would
+// actually understand. Each clause is only added
+// when we really know that fact.
+function buildReason({
+    taste,
+    category,
+    temperature,
+    product
+}){
+
+    const known = [];
+
+    if(taste){
+        known.push(`${taste.toLowerCase()} flavours`);
+    }
+
+    if(category){
+        known.push(`${category.toLowerCase()} drinks`);
+    }
+
+    if(temperature){
+        known.push(
+            `${temperature.toLowerCase()} drinks`
+        );
+    }
+
+    if(!known.length){
+
+        return "Picked from what other customers order most.";
+
+    }
+
+    // "fruity flavours and coffee drinks"
+    const profile =
+        known.length === 1
+            ? known[0]
+            : `${known.slice(0, -1).join(", ")} and ${known[known.length - 1]}`;
+
+    const matches = [];
+
+    if(taste && product?.taste === taste){
+        matches.push("the same taste profile");
+    }
+
+    if(category && product?.category === category){
+        matches.push("your usual category");
+    }
+
+    if(
+        temperature &&
+        product?.temperature === temperature
+    ){
+        matches.push("the temperature you prefer");
+    }
+
+    const because =
+        matches.length
+            ? ` It shares ${
+                matches.length === 1
+                    ? matches[0]
+                    : `${matches.slice(0, -1).join(", ")} and ${matches[matches.length - 1]}`
+              }.`
+            : " It sits close to your usual picks.";
+
+    return `From your past orders you lean towards ${profile}.${because}`;
+
+}
 
 
 function getHighest(obj){

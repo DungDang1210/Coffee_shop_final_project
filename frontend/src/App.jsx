@@ -17,11 +17,10 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import MenuManagement from "./pages/admin/MenuManagement";
 import OrderManagement from "./pages/admin/OrderManagement";
 import Reports from "./pages/admin/Reports";
-import Supplies from "./pages/admin/Supplies";
+import Inventory from "./pages/admin/Inventory";
 import AdminHome from "./pages/admin/AdminHome";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminProtectedRoute from "./pages/admin/AdminProtectedRoute";
-import StockHistory from "./pages/admin/inventory/components/StockHistory";
 
 import Toast from "./components/common/Toast";
 import Menu from "./pages/customer/Menu";
@@ -359,6 +358,7 @@ export default function App() {
               user={user}
               setUser={setUser}
               setFavorites={setFavorites}
+              showToast={showToast}
             />
           }
         />
@@ -446,6 +446,7 @@ export default function App() {
             <AdminProtectedRoute admin={admin}>
               <AdminDashboard
                 orders={orders}
+                setOrders={setOrders}
               />
             </AdminProtectedRoute>
           }
@@ -504,20 +505,10 @@ export default function App() {
             }
           />
 
-          {/* SUPPLIES */}
+          {/* INVENTORY */}
           <Route
-            path="supplies"
-            element={
-              <Supplies/>
-            }
-          />
-
-          {/* STOCK HISTORY */}
-          <Route
-              path="stock-history"
-              element={
-                  <StockHistory />
-              }
+              path="/admin/inventory"
+              element={<Inventory />}
           />
 
         </Route>

@@ -78,6 +78,22 @@ const productSchema = new mongoose.Schema(
     intensity: {
       type: Number,
       default: 1
+    },
+
+    // ===== Reviews =====
+    // These were in data/products.json all along but
+    // missing from the schema, so mongoose dropped
+    // them on every seed. That is why the UI fell
+    // back to a hard-coded "4.8 (124 reviews)".
+    // Kept in sync from the Review collection.
+    rating: {
+      type: Number,
+      default: 0
+    },
+
+    reviewCount: {
+      type: Number,
+      default: 0
     }
 
   },

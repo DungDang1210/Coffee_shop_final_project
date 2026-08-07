@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import InventoryStats from "./inventory/components/InventoryStats";
 import InventoryToolbar from "./inventory/components/InventoryToolbar";
@@ -6,8 +6,10 @@ import InventoryTable from "./inventory/components/InventoryTable";
 import InventoryModal from "./inventory/components/InventoryModal";
 import StockModal from "./inventory/components/StockModal";
 import StockHistory from "./inventory/components/StockHistory";
+import DeleteIngredientModal from "./inventory/components/DeleteIngredientModal";
+import ExcelGuide from "../../components/admin/ExcelGuide";
 
-export default function Supplies() {
+export default function Inventory() {
 
     const emptyForm = {
 
@@ -27,6 +29,8 @@ export default function Supplies() {
 
     const [search,setSearch] = useState("");
 
+    const fileInputRef = useRef(null);
+
     const [category,setCategory] = useState("All");
 
     const [modalOpen,setModalOpen] = useState(false);
@@ -42,6 +46,8 @@ export default function Supplies() {
     const [stockType,setStockType]=useState("");
 
     const [historyOpen,setHistoryOpen] = useState(false);
+
+    const [guideOpen,setGuideOpen] = useState(false);
     
     // Fetch inventory
 
@@ -116,13 +122,30 @@ export default function Supplies() {
 
     };
 
+    // delete now goes through a confirmation step
+    const [deleteItem,setDeleteItem] = useState(null);
+
+    const [deleting,setDeleting] = useState(false);
+
+    const [error,setError] = useState("");
+
     const deleteInventory = async(id)=>{
 
+        if(!id){
+
+            setError("Cannot delete: missing id.");
+
+            return;
+
+        }
+
+        setError("");
+
+        setDeleting(true);
 
         try{
 
-
-            await fetch(
+            const res = await fetch(
 
                 `http://localhost:5000/api/inventory/${id}`,
 
@@ -132,9 +155,21 @@ export default function Supplies() {
 
             );
 
+            if(!res.ok){
 
-            fetchInventory();
+                const body =
+                    await res.json().catch(()=>({}));
 
+                throw new Error(
+                    body.message ||
+                    `Delete failed (HTTP ${res.status})`
+                );
+
+            }
+
+            await fetchInventory();
+
+            setDeleteItem(null);
 
         }
 
@@ -142,8 +177,15 @@ export default function Supplies() {
 
             console.log(err);
 
+            setError(err.message);
+
         }
 
+        finally{
+
+            setDeleting(false);
+
+        }
 
     };
 
@@ -172,11 +214,71 @@ export default function Supplies() {
 
         <div>
 
-            <h1 className="text-3xl font-bold mb-8">
+            <h1 className="text-3xl font-bold mb-2">
 
                 Inventory Management
 
             </h1>
+
+            <p className="text-gray-500 mb-8">
+                Stock status updates itself: at or below
+                the minimum shows <strong>Low Stock</strong>,
+                zero shows <strong>Out of Stock</strong>.
+            </p>
+
+            {error && (
+
+                <div
+                    role="alert"
+                    className="mb-6 bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-2xl flex items-start justify-between gap-4"
+                >
+
+                    <span className="text-sm">{error}</span>
+
+                    <button
+                        onClick={()=>setError("")}
+                        className="text-red-500 hover:text-red-800 shrink-0"
+                    >
+                        ✕
+                    </button>
+
+                </div>
+
+            )}
+
+            <input
+                type="file"
+                accept=".xlsx,.xls"
+                ref={fileInputRef}
+                hidden
+                onChange={async (e) => {
+
+                    const file = e.target.files[0];
+
+                    if (!file) return;
+
+                    const formData = new FormData();
+
+                    formData.append("file", file);
+
+                    await fetch(
+
+                        "http://localhost:5000/api/inventory/import-excel",
+
+                        {
+
+                            method: "POST",
+
+                            body: formData
+
+                        }
+
+                    );
+
+                    fetchInventory();
+
+                }}
+            />
 
             <InventoryStats
 
@@ -202,9 +304,9 @@ export default function Supplies() {
 
                 }}
 
-                onImport={()=>{
+                onImport={() => {
 
-                    console.log("Import Excel");
+                    fileInputRef.current.click();
 
                 }}
 
@@ -213,6 +315,22 @@ export default function Supplies() {
                     setHistoryOpen(true);
 
                 }}
+
+                onGuide={()=>{
+
+                    setGuideOpen(true);
+
+                }}
+
+            />
+
+            <ExcelGuide
+
+                open={guideOpen}
+
+                mode="inventory"
+
+                onClose={()=>setGuideOpen(false)}
 
             />
 
@@ -232,7 +350,9 @@ export default function Supplies() {
 
                 onDelete={(item)=>{
 
-                    deleteInventory(item._id);
+                    // open the confirm dialog instead of
+                    // deleting on the first click
+                    setDeleteItem(item);
 
                 }}
 
@@ -246,8 +366,6 @@ export default function Supplies() {
 
                 }}
             />
-
-            <StockHistory />
 
             <InventoryModal
 
@@ -310,16 +428,39 @@ export default function Supplies() {
                 }}
 
             />
+            <DeleteIngredientModal
+
+                open={Boolean(deleteItem)}
+
+                item={deleteItem}
+
+                deleting={deleting}
+
+                onClose={()=>{
+
+                    setDeleteItem(null);
+
+                    setError("");
+
+                }}
+
+                onConfirm={deleteInventory}
+
+            />
+
+            {
+            historyOpen && (
+
+                <StockHistory
+                    open={historyOpen}
+                    onClose={() => setHistoryOpen(false)}
+                />
+
+            )
+            }
 
         </div>
         
 
     );
-    {
-    historyOpen && (
-
-        <StockHistory/>
-
-    )
-    }
 }

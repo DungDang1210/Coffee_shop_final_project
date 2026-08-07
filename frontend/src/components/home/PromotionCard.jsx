@@ -1,21 +1,33 @@
+import { useState } from "react";
+
+import { getPromoStyle } from "../../utils/promoTypes";
+
 export default function PromotionCard({
   promo,
   active,
-  onApply
+  onApply,
+  onDetails
 }) {
 
-  const backgrounds = {
-    FREESHIP: "from-green-500 to-emerald-700",
-    FLASHSALE: "from-orange-500 to-red-600",
-    BUY5GET1: "from-purple-600 to-pink-600",
-    ECO: "from-teal-500 to-green-600"
-  };
+  const style = getPromoStyle(promo.type);
 
-  const labels = {
-    FREESHIP: "🚚 Free Shipping",
-    FLASHSALE: "⚡ Happy Hour",
-    BUY5GET1: "🥤 Buy 5 Get 1",
-    ECO: "🌱 Eco Reward"
+  const [failed, setFailed] = useState("");
+
+  const image =
+    failed === "all"
+      ? null
+      : failed === "banner" || !promo.banner
+        ? style.image
+        : promo.banner;
+
+  const handleImageError = () => {
+
+    setFailed(prev =>
+      prev === "banner" || !promo.banner
+        ? "all"
+        : "banner"
+    );
+
   };
 
   return (
@@ -23,7 +35,7 @@ export default function PromotionCard({
     <div
       className={`
       bg-gradient-to-br
-      ${backgrounds[promo.type] || "from-[#6b4f4f] to-[#2d1e1e]"}
+      ${style.gradient}
       text-white
       rounded-3xl
       p-6
@@ -39,11 +51,13 @@ export default function PromotionCard({
       </div>
 
       {/* Banner */}
-      {promo.banner && (
+      {image && (
 
         <img
-          src={promo.banner}
-          alt={promo.title}
+          key={image}
+          src={image}
+          alt=""
+          onError={handleImageError}
           className="
           w-full
           h-40
@@ -63,41 +77,55 @@ export default function PromotionCard({
         {promo.description}
       </p>
 
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-end gap-3">
 
-        <div>
+        <div className="min-w-0">
 
           <p className="text-sm opacity-80">
             Promotion Type
           </p>
 
-          <p className="text-xl font-bold tracking-widest">
-            {labels[promo.type]}
+          <p className="text-lg font-bold tracking-wide truncate">
+            {style.icon} {style.label}
           </p>
+
+          {promo.code && (
+
+            <p className="font-mono text-xs mt-1 opacity-80 tracking-widest">
+              {promo.code}
+            </p>
+
+          )}
 
         </div>
 
-        <button
+        <div className="flex flex-col gap-2 shrink-0">
 
-          onClick={() => onApply(promo)}
+          <button
 
-          className={`
-          px-5
-          py-2
-          rounded-full
-          font-semibold
-          transition
-          ${
-            active
-              ? "bg-white text-black"
-              : "bg-black/20 hover:bg-black/40"
-          }
-          `}
-        >
+            onClick={() => onApply(promo)}
 
-          {active ? "Applied ✓" : "Apply"}
+            className={`px-5 py-2 rounded-full font-semibold transition whitespace-nowrap ${
+              active
+                ? "bg-white text-black"
+                : "bg-black/20 hover:bg-black/40"
+            }`}
+          >
 
-        </button>
+            {active ? "Applied ✓" : "Apply"}
+
+          </button>
+
+          {/* details so the customer can actually
+              understand the offer */}
+          <button
+            onClick={() => onDetails?.(promo)}
+            className="px-5 py-1.5 rounded-full text-sm font-medium border border-white/40 hover:bg-white/15 transition whitespace-nowrap"
+          >
+            Details
+          </button>
+
+        </div>
 
       </div>
 

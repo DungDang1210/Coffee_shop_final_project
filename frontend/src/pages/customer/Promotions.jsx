@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import PromotionCard from "../../components/home/PromotionCard";
 import Navbar from "../../components/common/Navbar";
+import MemberAward from "../../components/rewards/MemberAward";
+import PromotionDetailModal from "../../components/home/PromotionDetailModal";
+
+import {
+  getAppliedPromotion,
+  applyPromotion,
+  clearPromotion,
+  onPromotionChange
+} from "../../utils/promotions";
 
 export default function Promotions({
   cart = [],
@@ -11,20 +20,18 @@ export default function Promotions({
 
   const [promotions ,setPromotions]=useState([]);
 
-  const [applied,setApplied]=useState(null);
+  const [applied,setApplied]=
+    useState(getAppliedPromotion);
 
-  useEffect(() => {
+  // promo whose details are open
+  const [detailPromo,setDetailPromo]=
+    useState(null);
 
-    const savedPromo =
-      JSON.parse(
-        localStorage.getItem("promotion")
-      );
-
-    if(savedPromo){
-      setApplied(savedPromo);
-    }
-
-  }, []);
+  // stays in sync with the home page banner
+  useEffect(
+    () => onPromotionChange(setApplied),
+    []
+  );
 
   useEffect(()=>{
 
@@ -53,15 +60,7 @@ export default function Promotions({
 
   const apply = (promo) => {
 
-    localStorage.setItem(
-
-      "promotion",
-
-      JSON.stringify(promo)
-
-    );
-
-    setApplied(promo);
+    applyPromotion(promo);
 
     showToast?.(
 
@@ -69,16 +68,6 @@ export default function Promotions({
 
     );
 
-  };
-
-  const copyCoupon = (code) => {
-    navigator.clipboard.writeText(code);
-
-    if (showToast) {
-      showToast(`Coupon ${code} copied!`);
-    } else {
-      alert(`Coupon ${code} copied!`);
-    }
   };
 
   return (
@@ -102,12 +91,35 @@ export default function Promotions({
             </p>
 
             <h1 className="text-5xl md:text-6xl font-black text-[#2d1e1e] mb-5">
-              s & Deals 🎉
+              Specials & Deals 🎉
             </h1>
 
             <p className="text-gray-600 text-lg max-w-2xl mx-auto">
               Enjoy handcrafted coffee with exclusive discounts,
               seasonal rewards, and member-only specials.
+            </p>
+
+          </div>
+
+          {/* MEMBER REWARDS — first, so members see
+              what they've earned before the public
+              deals */}
+          <div className="mb-16">
+
+            <MemberAward user={user} />
+
+          </div>
+
+          {/* PUBLIC DEALS */}
+          <div className="mb-8">
+
+            <h2 className="text-3xl font-black text-[#2d1e1e] mb-2">
+              Deals for everyone
+            </h2>
+
+            <p className="text-gray-600">
+              Available to all customers — pick one at
+              checkout.
             </p>
 
           </div>
@@ -140,6 +152,10 @@ export default function Promotions({
             apply
             }
 
+            onDetails={
+            setDetailPromo
+            }
+
             />
 
 
@@ -158,9 +174,7 @@ export default function Promotions({
 
                     onClick={() => {
 
-                      setApplied(null);
-
-                      localStorage.removeItem("promotion");
+                      clearPromotion();
 
                       showToast?.("Promotion removed");
 
@@ -183,37 +197,15 @@ export default function Promotions({
               )
             }
 
-          {/* MEMBER SECTION */}
-          <div className="mt-16 bg-[#efe7de] rounded-[32px] p-10 flex flex-col lg:flex-row justify-between items-center gap-8">
-
-            <div>
-
-              <p className="uppercase tracking-[4px] text-[#c08b5c] text-sm mb-3">
-                MEMBER REWARDS
-              </p>
-
-              <h2 className="text-4xl font-black text-[#2d1e1e] mb-4">
-                Earn Free Drinks Faster
-              </h2>
-
-              <p className="text-gray-600 max-w-2xl">
-                Join Brew Haven Rewards and collect points
-                every time you order coffee, desserts,
-                or seasonal specials.
-              </p>
-
-            </div>
-
-            <button
-              onClick={() => copyCoupon("BREWVIP")}
-              className="bg-[#2d1e1e] hover:bg-[#4b332f] text-white px-8 py-4 rounded-full font-semibold transition hover:scale-105"
-            >
-              Join Rewards
-            </button>
-
-          </div>
-
         </div>
+
+        <PromotionDetailModal
+          promo={detailPromo}
+          applied={applied?._id === detailPromo?._id}
+          onApply={apply}
+          onClose={() => setDetailPromo(null)}
+          showToast={showToast}
+        />
 
       </section>
     </>

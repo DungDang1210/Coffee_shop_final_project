@@ -2,7 +2,8 @@ import {
     Search,
     Plus,
     Upload,
-    History
+    History,
+    HelpCircle
 } from "lucide-react";
 
 const categories = [
@@ -29,7 +30,8 @@ export default function InventoryToolbar({
 
     onAdd,
     onImport,
-    onHistory
+    onHistory,
+    onGuide
 
 }) {
 
@@ -148,6 +150,35 @@ export default function InventoryToolbar({
 
                     </button>
 
+                    {/* how to build the file */}
+                    <button
+
+                        onClick={onGuide}
+
+                        title="Excel format guide + template"
+
+                        className="
+                        flex
+                        items-center
+                        gap-2
+                        px-4
+                        py-3
+                        rounded-xl
+                        border
+                        border-green-300
+                        text-green-700
+                        hover:bg-green-50
+                        transition
+                        "
+
+                    >
+
+                        <HelpCircle size={18}/>
+
+                        Format guide
+
+                    </button>
+
                     <button
 
                         onClick={onImport}
@@ -159,9 +190,10 @@ export default function InventoryToolbar({
                         px-5
                         py-3
                         rounded-xl
-                        bg-emerald-600
-                        hover:bg-emerald-700
+                        bg-green-600
+                        hover:bg-green-700
                         text-white
+                        font-semibold
                         transition
                         "
 

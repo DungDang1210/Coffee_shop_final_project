@@ -132,10 +132,10 @@ export default function Navbar({
 
                   {user?.avatar ? (
                     <img
-                      src={user.avatar || "/images/default-avatar.png"}
+                      src={user.avatar || "/images/default-avatar.svg"}
                       alt={user.name}
                       onError={(e) => {
-                        e.target.src = "/images/default-avatar.png";
+                        e.target.src = "/images/default-avatar.svg";
                       }}
                       className="
                       w-12

@@ -135,8 +135,11 @@ export default function ProductTable({
                   </button>
 
 
+                  {/* pass the whole product — the
+                      confirm dialog needs its name */}
                   <button
-                    onClick={() => onDelete(product._id)}
+                    onClick={() => onDelete(product)}
+                    title={`Delete ${product.name}`}
                     className="text-red-600 hover:text-red-800"
                   >
 

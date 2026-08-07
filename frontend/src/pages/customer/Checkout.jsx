@@ -1,5 +1,16 @@
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+
+import useMemberRewards from "../../hooks/useMemberRewards";
+
+import {
+  rankVouchers,
+  voucherSavings,
+  voucherLabel,
+  priceCart,
+  voucherKey,
+  sameVoucher
+} from "../../utils/voucherValue";
 
 export default function Checkout({
   cart,
@@ -63,13 +74,10 @@ export default function Checkout({
 
           async(position)=>{
 
-
               const {
                   latitude,
                   longitude
               } = position.coords;
-
-
 
               console.log(
                   "Current GPS:",
@@ -77,40 +85,20 @@ export default function Checkout({
                   longitude
               );
 
-
-
               try{
 
-
                   const response = await fetch(
-
                       `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-
                       {
-
                           headers:{
                               "Accept-Language":"en",
                               "User-Agent":
                               "CoffeeShop-MERN-App"
                           }
-
                       }
-
                   );
-
-
-
                   const data =
                   await response.json();
-
-
-
-                  console.log(
-                      "Address:",
-                      data
-                  );
-
-
 
                   setCustomer(prev=>({
 
@@ -121,31 +109,22 @@ export default function Checkout({
 
                   }));
 
-
-
               }
 
               catch(err){
-
 
                   console.log(
                       "Reverse geocode error:",
                       err
                   );
 
-
                   setLocationError(
                       "Cannot convert GPS to address."
                   );
 
-
               }
 
-
-
               setLocationLoading(false);
-
-
 
           },
 
@@ -275,97 +254,107 @@ export default function Checkout({
     0
   );
 
-  const availableVouchers = promotions;
+  // =========================
+  // WHAT THIS CUSTOMER MAY USE
+  //
+  // public promotions + the personal vouchers
+  // on their own account (new-member 20%, tier
+  // rewards). Another customer's vouchers are
+  // never in this list.
+  // =========================
+  const { usableVouchers } =
+    useMemberRewards(user);
+
+  const availableVouchers = useMemo(
+    () => [
+      ...usableVouchers,
+      ...promotions
+    ],
+    [usableVouchers, promotions]
+  );
+
+  // ranked by real dong saved on THIS cart
+  const ranked = useMemo(
+    () => rankVouchers(cart, availableVouchers),
+    [cart, availableVouchers]
+  );
+
+  const bestOption =
+    ranked.find(r => r.usable && r.savings > 0) || null;
 
   const bestVoucher =
-    availableVouchers.length
-    ?
-    availableVouchers.reduce((best,current)=>{
-
-    if(
-    !best ||
-    current.discount>best.discount
-    ){
-    return current;
-    }
-
-    return best;
-
-    })
-    :
-    null;
+    bestOption?.voucher || null;
 
   const [showPaymentModal,
     setShowPaymentModal] =
+    useState(false);
+
+  // auto-apply the genuinely best voucher once
+  const [autoApplied, setAutoApplied] =
     useState(false);
 
   useEffect(() => {
 
     if (
       bestVoucher &&
-      !appliedVoucher
+      !appliedVoucher &&
+      !autoApplied
     ) {
 
-      setAppliedVoucher(
-        bestVoucher
-      );
+      setAppliedVoucher(bestVoucher);
+
+      setAutoApplied(true);
 
     }
 
-  }, [bestVoucher]);
+  }, [bestVoucher, appliedVoucher, autoApplied]);
+
+  // if the cart changed so the applied voucher no
+  // longer qualifies, drop it rather than quietly
+  // charging the wrong total
+  useEffect(() => {
+
+    if (!appliedVoucher) return;
+
+    const stillOk =
+      ranked.find(
+        r => sameVoucher(r.voucher, appliedVoucher)
+      );
+
+    if (stillOk && !stillOk.usable) {
+
+      setAppliedVoucher(null);
+
+    }
+
+  }, [ranked, appliedVoucher]);
 
   const formatPrice = (price) => {
     return price.toLocaleString("vi-VN") + " ₫";
   };
 
-  const deliveryFee = 15000;
-
   const voucher = appliedVoucher;
 
-  let discount = 0;
+  // single source of truth for the maths, shared
+  // with the voucher ranking so the "you save X"
+  // figure always matches the total below
+  const pricing = useMemo(
+    () => priceCart(cart, voucher),
+    [cart, voucher]
+  );
 
-  if (
-      voucher?.discount
-  ) {
+  const discount = pricing.percentOff;
 
-      discount =
-        subtotal *
-        voucher.discount /
-        100;
+  const promotionDiscount = pricing.perkOff;
 
-  }
-  
-  const promotionDiscount =
-  voucher?.type === "FREESHIP"
-  ? deliveryFee
-  : voucher?.type === "FLASHSALE"
-  ? subtotal * 0.15
-  : voucher?.type === "BUY5GET1"
-  ? cart.length >= 6
-    ? Math.min(...cart.map(i => i.price))
-    : 0
-  : voucher?.type === "ECO"
-  ? 5000
-  : 0;
+  const shippingFee = pricing.shippingFee;
 
-  const discountedSubtotal =
-  subtotal - discount;
+  const tax = pricing.tax;
 
-  const shippingFee =
-  voucher?.type === "FREESHIP"
-  ? 0
-  : deliveryFee;
+  const grandTotal = pricing.total;
 
-  const totalAfterPromotion =
-  discountedSubtotal - promotionDiscount;
-
-  const tax =
-  totalAfterPromotion * 0.1;
-
-  const grandTotal =
-  totalAfterPromotion +
-  shippingFee +
-  tax;
+  const totalSaved =
+    voucherSavings(cart, voucher);
   
     const paymentQRs = {
       MoMo: "/images/momo-qr.png",
@@ -447,6 +436,15 @@ export default function Checkout({
 
         status: "Pending",
 
+        // set by "Reorder" in order history, so the
+        // admin can tell a repeat from a fresh order
+        isReorder: Boolean(
+          localStorage.getItem("reorderOf")
+        ),
+
+        reorderOf:
+          localStorage.getItem("reorderOf") || null,
+
         paymentStatus: "Paid",
 
         paymentMethod: customer.paymentMethod,
@@ -498,6 +496,9 @@ export default function Checkout({
 
       setCart([]);
 
+      // the reorder flag is single-use
+      localStorage.removeItem("reorderOf");
+
       navigate("/success");
 
     } catch (err) {
@@ -547,7 +548,7 @@ export default function Checkout({
             {/* Customer Info */}
             <div className="bg-[#f8f3ef] rounded-2xl p-6">
 
-              <div className="flex justify-between items-center mb-5">
+              <div className="flex justify-between items-center mb-2">
 
                 <h3 className="font-bold text-lg">
                   Account Information
@@ -565,42 +566,82 @@ export default function Checkout({
 
               </div>
 
+              {/* only the address is editable here —
+                  the rest comes from the profile */}
+              <p className="text-sm text-gray-500 mb-5">
+                From your profile.{" "}
+                <button
+                  type="button"
+                  onClick={() => navigate("/profile")}
+                  className="text-[#6b4f4f] font-semibold hover:underline"
+                >
+                  Edit profile
+                </button>{" "}
+                to change your name or phone.
+              </p>
+
               <div className="space-y-4">
 
-                <div>
-                  <p className="text-gray-500 text-sm">
-                    Full Name
-                  </p>
+                <div className="grid sm:grid-cols-3 gap-4">
 
-                  <p className="font-semibold">
-                    {user?.name}
-                  </p>
+                  <div className="bg-white/60 rounded-xl px-4 py-3">
+
+                    <p className="text-gray-500 text-xs">
+                      Full Name
+                    </p>
+
+                    <p className="font-semibold truncate">
+                      {user?.name || "—"}
+                    </p>
+
+                  </div>
+
+                  <div className="bg-white/60 rounded-xl px-4 py-3">
+
+                    <p className="text-gray-500 text-xs">
+                      Email
+                    </p>
+
+                    <p className="font-semibold truncate">
+                      {user?.email || "—"}
+                    </p>
+
+                  </div>
+
+                  <div className="bg-white/60 rounded-xl px-4 py-3">
+
+                    <p className="text-gray-500 text-xs">
+                      Phone
+                    </p>
+
+                    {
+                      user?.phone
+                        ? (
+                          <p className="font-semibold truncate">
+                            {user.phone}
+                          </p>
+                        )
+                        : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate("/profile")
+                            }
+                            className="text-sm text-red-600 font-semibold hover:underline"
+                          >
+                            Add a phone number
+                          </button>
+                        )
+                    }
+
+                  </div>
+
                 </div>
 
                 <div>
-                  <p className="text-gray-500 text-sm">
-                    Email
-                  </p>
 
-                  <p className="font-semibold">
-                    {user?.email}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-gray-500 text-sm">
-                    Phone
-                  </p>
-
-                  <p className="font-semibold">
-                    {user?.phone}
-                  </p>
-                </div>
-
-                <div>
-
-                  <p className="text-gray-500 text-sm">
-                  Delivery Address
+                  <p className="text-gray-500 text-sm font-semibold">
+                  Delivery Address *
                   </p>
 
 
@@ -667,28 +708,33 @@ export default function Checkout({
 
             </div>
 
-            {bestVoucher && !appliedVoucher && (
+            {bestOption && !appliedVoucher && (
 
-              <div className="
-                bg-yellow-50
-                border
-                border-yellow-300
-                p-3
-                rounded-xl
-                mb-4
-              ">
+              <div className="bg-amber-50 border border-amber-300 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3">
 
-                ⭐ Recommended:
+                <div>
 
-                <strong>{bestVoucher.title}</strong>
+                  <p className="font-bold text-amber-900">
+                    ⭐ Best for this cart: {bestOption.voucher.title}
+                  </p>
 
-                {" "}
-                (
-                {bestVoucher.type === "FREESHIP"
-                  ? "Free Shipping"
-                  : `${bestVoucher.discount}% OFF`}
-)
-                
+                  <p className="text-sm text-amber-800 mt-0.5">
+                    {voucherLabel(bestOption.voucher)} — saves{" "}
+                    {formatPrice(bestOption.savings)}
+                  </p>
+
+                </div>
+
+                <button
+                  onClick={() =>
+                    setAppliedVoucher(
+                      bestOption.voucher
+                    )
+                  }
+                  className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-semibold transition"
+                >
+                  Apply
+                </button>
 
               </div>
 
@@ -758,62 +804,52 @@ export default function Checkout({
                 onClick={() =>
                   setShowVoucherModal(true)
                 }
-                className="
-                  w-full
-                  border
-                  rounded-xl
-                  p-4
-                  flex
-                  justify-between
-                  items-center
-                  hover:bg-gray-50
-                "
+                className="w-full border rounded-xl p-4 flex justify-between items-center gap-3 hover:bg-gray-50 text-left transition"
               >
-                <span>
+
+                <span className="min-w-0">
+
                   {appliedVoucher
-                  ? `${appliedVoucher.title} ${
-                      appliedVoucher.type === "FREESHIP"
-                        ? "(Free Shipping)"
-                        : `(${appliedVoucher.discount}% OFF)`
-                    }`
-                  : "Choose Available Voucher"}
+                    ? (
+                      <>
+                        <span className="block font-semibold truncate">
+                          {appliedVoucher.title}
+                        </span>
+
+                        <span className="block text-sm text-green-600">
+                          {voucherLabel(appliedVoucher)} — saves{" "}
+                          {formatPrice(totalSaved)}
+                        </span>
+                      </>
+                    )
+                    : (
+                      <>
+                        <span className="block font-semibold">
+                          Choose a voucher
+                        </span>
+
+                        <span className="block text-sm text-gray-500">
+                          {ranked.length} available
+                        </span>
+                      </>
+                    )}
+
                 </span>
 
-                <span>›</span>
+                <span className="shrink-0">›</span>
+
               </button>
-
-              {bestVoucher && (
-                <p className="text-sm text-green-600 mt-2">
-
-                  {bestVoucher.type==="FREESHIP"
-
-                  ?
-                  "Free Shipping Available"
-
-                  :
-                  `Save up to ${formatPrice(
-                  subtotal*bestVoucher.discount/100
-                  )}`
-                  }
-
-                </p>
-              )}
 
               {voucher && (
 
-              <button
-              onClick={()=>{
-              setAppliedVoucher(null);
-              }}
-              className="
-              mt-2
-              text-red-500
-              text-sm
-              hover:underline
-              "
-              >
-              Remove Voucher
-              </button>
+                <button
+                  onClick={() => {
+                    setAppliedVoucher(null);
+                  }}
+                  className="mt-2 text-red-500 text-sm hover:underline"
+                >
+                  Remove Voucher
+                </button>
 
               )}
 
@@ -872,7 +908,7 @@ export default function Checkout({
 
                 <div className="text-sm mt-1">
 
-                Save{" "}{formatPrice( discount + promotionDiscount )}
+                Save{" "}{formatPrice(totalSaved)}
 
                 </div>
 
@@ -992,90 +1028,146 @@ export default function Checkout({
                     "
                   />
 
-                  {availableVouchers
-                    .filter(v =>
-                      v.title
+                  <p className="text-sm text-gray-500 mb-3">
+                    Sorted by how much each one saves on
+                    your current cart.
+                  </p>
+
+                  {ranked
+                    .filter(({ voucher }) =>
+                      (voucher.title || "")
                         .toLowerCase()
                         .includes(
                           searchVoucher.toLowerCase()
                         )
                     )
-                    .map(voucher => (
+                    .map(({ voucher, savings, blocker, usable }) => {
 
-                      <div
-                        key={voucher._id}
-                        onClick={() => {
+                      // compare by identity, not by
+                      // `code`: DB promos have no code,
+                      // so every row used to match
+                      const isBest =
+                        sameVoucher(
+                          voucher,
+                          bestOption?.voucher
+                        );
 
-                          setAppliedVoucher(
-                            voucher
-                          );
+                      const isApplied =
+                        sameVoucher(
+                          voucher,
+                          appliedVoucher
+                        );
 
-                          setShowVoucherModal(
-                            false
-                          );
+                      return (
 
-                        }}
-                        className="
-                          border
-                          rounded-xl
-                          p-4
-                          mb-3
-                          cursor-pointer
-                          hover:bg-[#f8f3ef]
-                        "
-                      >
+                        <button
+                          key={voucherKey(voucher)}
+                          disabled={!usable}
+                          onClick={() => {
 
-                        <div className="flex justify-between">
+                            setAppliedVoucher(voucher);
 
-                          <div>
+                            setShowVoucherModal(false);
 
-                            <div className="font-bold text-orange-600">
-                              {voucher.title}
+                          }}
+                          className={`w-full text-left border rounded-xl p-4 mb-3 transition ${
+                            !usable
+                              ? "opacity-60 cursor-not-allowed bg-gray-50"
+                              : isApplied
+                                ? "border-[#6b4f4f] bg-[#f8f3ef]"
+                                : "cursor-pointer hover:bg-[#f8f3ef]"
+                          }`}
+                        >
+
+                          <div className="flex justify-between gap-3">
+
+                            <div className="min-w-0">
+
+                              <div className="font-bold text-[#6b4f4f] flex items-center gap-2 flex-wrap">
+
+                                {voucher.title}
+
+                                {voucher.source && (
+
+                                  <span className="bg-[#f3e2d0] text-[#8a5f34] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                                    {
+                                      voucher.source === "WELCOME"
+                                        ? "New member"
+                                        : "Member reward"
+                                    }
+                                  </span>
+
+                                )}
+
+                              </div>
+
+                              <div className="text-sm text-gray-500">
+                                {voucherLabel(voucher)}
+                              </div>
+
+                              {
+                                blocker
+                                  ? (
+                                    <div className="text-sm text-amber-700 mt-1">
+                                      {blocker}
+                                    </div>
+                                  )
+                                  : (
+                                    <div className="text-sm font-semibold text-green-600 mt-1">
+                                      {
+                                        savings > 0
+                                          ? `You save ${formatPrice(savings)}`
+                                          : "No saving on this cart"
+                                      }
+                                    </div>
+                                  )
+                              }
+
+                              {voucher.code && (
+
+                                <div className="text-xs font-mono text-gray-400 mt-1">
+                                  {voucher.code}
+                                </div>
+
+                              )}
+
                             </div>
 
-                            <div className="text-sm text-gray-500">
+                            <div className="shrink-0 flex flex-col items-end gap-2">
 
-                             {voucher.type==="FREESHIP"
-                              ? "Free Shipping"
+                              {isBest && usable && (
 
-                              : voucher.type==="FLASHSALE"
-                              ? "15% Flash Sale"
+                                <span className="bg-amber-500 text-white text-xs px-3 py-1 rounded-full whitespace-nowrap">
+                                  BEST VALUE
+                                </span>
 
-                              : voucher.type==="BUY5GET1"
-                              ? "Buy 5 Get 1"
+                              )}
 
-                              : voucher.type==="ECO"
-                              ? "Eco Discount"
+                              {isApplied && (
 
-                              : `Save ${voucher.discount}%`
-                              }
+                                <span className="bg-[#6b4f4f] text-white text-xs px-3 py-1 rounded-full">
+                                  APPLIED
+                                </span>
+
+                              )}
+
                             </div>
 
                           </div>
 
-                          {voucher._id === bestVoucher?._id && (
+                        </button>
 
-                            <span
-                              className="
-                              bg-orange-500
-                              text-white
-                              text-xs
-                              px-3
-                              py-1
-                              rounded-full
-                              h-fit
-                              "
-                            >
-                              RECOMMENDED
-                            </span>
+                      );
 
-                          )}
+                    })}
 
-                        </div>
+                  {!ranked.length && (
 
-                      </div>
+                    <p className="text-center text-gray-500 py-6">
+                      No vouchers available right now.
+                    </p>
 
-                  ))}
+                  )}
 
                 </div>
 

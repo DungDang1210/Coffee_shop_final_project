@@ -4,6 +4,43 @@ const router = express.Router();
 const Inventory = require("../models/Inventory");
 const InventoryHistory = require("../models/InventoryHistory");
 
+const multer = require("multer");
+const XLSX = require("xlsx");
+
+const upload = multer({
+    dest: "uploads/"
+});
+
+
+// ======================
+// STATUS IS DERIVED, NOT TYPED
+//
+// `status` used to be a free-text field that
+// defaulted to "Available" and never changed, so
+// an ingredient could read Available at 0 kg.
+// Every write recomputes it from stock now.
+// ======================
+
+const STATUS = {
+    OUT: "Out of Stock",
+    LOW: "Low Stock",
+    OK: "Available"
+};
+
+function deriveStatus(item = {}) {
+
+    const stock = Number(item.stock) || 0;
+
+    const minStock = Number(item.minStock) || 0;
+
+    if (stock <= 0) return STATUS.OUT;
+
+    if (stock <= minStock) return STATUS.LOW;
+
+    return STATUS.OK;
+
+}
+
 
 // ======================
 // GET ALL
@@ -31,6 +68,142 @@ router.get("/", async (req, res) => {
 
 });
 
+// ======================
+// GET HISTORY
+// ======================
+
+router.get("/history/all", async (req, res) => {
+
+    try {
+
+        const history =
+            await InventoryHistory.find()
+            .sort({
+                createdAt: -1
+            });
+
+        res.json(history);
+
+    }
+
+    catch (err) {
+
+        res.status(500).json(err);
+
+    }
+
+});
+
+// ======================
+// IMPORT EXCEL
+// ======================
+
+    router.post(
+        "/import-excel",
+        upload.single("file"),
+        async (req, res) => {
+
+            try {
+
+                const workbook =
+                    XLSX.readFile(req.file.path);
+
+                const sheet =
+                    workbook.Sheets[
+                        workbook.SheetNames[0]
+                    ];
+
+                const rows =
+                    XLSX.utils.sheet_to_json(sheet);
+
+                for (const row of rows) {
+
+                    const exist =
+                        await Inventory.findOne({
+                            name: row.name
+                        });
+
+                    if (exist) {
+
+                        exist.stock += Number(row.stock);
+
+                        await exist.save();
+
+                        await InventoryHistory.create({
+
+                            ingredient: exist.name,
+
+                            action: "IMPORT",
+
+                            quantity: Number(row.stock),
+
+                            unit: exist.unit,
+
+                            note: "Imported from Excel"
+
+                        });
+
+                    }
+
+                    else {
+
+                        const item =
+                            await Inventory.create({
+
+                                name: row.name,
+
+                                category: row.category,
+
+                                supplier: row.supplier,
+
+                                stock: Number(row.stock),
+
+                                unit: row.unit,
+
+                                minStock: Number(row.minStock),
+
+                                costPrice: Number(row.costPrice),
+
+                                location: row.location,
+
+                                status: "Available"
+
+                            });
+
+                        await InventoryHistory.create({
+
+                            ingredient: item.name,
+
+                            action: "IMPORT",
+
+                            quantity: item.stock,
+
+                            unit: item.unit,
+
+                            note: "Created from Excel"
+
+                        });
+
+                    }
+
+                }
+
+                res.json({
+                    success: true
+                });
+
+            }
+
+            catch (err) {
+
+                console.log(err);
+
+                res.status(500).json(err);
+
+            }
+
+        }
+    );
 
 // ======================
 // CREATE
@@ -51,7 +224,10 @@ router.post("/", async (req, res) => {
 
         }
 
-        const item = await Inventory.create(req.body);
+        const item = await Inventory.create({
+            ...req.body,
+            status: deriveStatus(req.body)
+        });
 
         console.log("Created:");
         console.log(item);
@@ -77,11 +253,32 @@ router.put("/:id", async (req, res) => {
 
     try {
 
+        // recompute status from the incoming stock so
+        // it can never disagree with the numbers
+        const existing =
+            await Inventory.findById(req.params.id);
+
+        if (!existing) {
+
+            return res.status(404).json({
+                message: "Ingredient not found"
+            });
+
+        }
+
+        const merged = {
+            ...existing.toObject(),
+            ...req.body
+        };
+
         const item = await Inventory.findByIdAndUpdate(
 
             req.params.id,
 
-            req.body,
+            {
+                ...req.body,
+                status: deriveStatus(merged)
+            },
 
             { new: true }
 
@@ -160,12 +357,6 @@ router.put("/import/:id", async (req, res) => {
     try {
 
         const item = await Inventory.findById(req.params.id);
-
-        console.log("========== IMPORT ==========");
-        console.log("ID:", req.params.id);
-        console.log("Request body:", req.body);
-        console.log("Item from DB:", item);
-
         if (!item) {
 
             return res.status(404).json({
@@ -175,9 +366,6 @@ router.put("/import/:id", async (req, res) => {
         }
 
         const stock = Number(req.body.stock);
-
-        console.log("Receive stock:", stock);
-        console.log("Current stock:", item.stock);
 
         if (stock <= 0) {
 
@@ -189,12 +377,9 @@ router.put("/import/:id", async (req, res) => {
 
         item.stock += stock;
 
-        console.log("Before update:", item.stock);
-        console.log("After update:", item.stock);
+        item.status = deriveStatus(item);
 
         await item.save();
-
-        console.log("Saved successfully");
 
         await InventoryHistory.create({
 
@@ -234,12 +419,6 @@ router.put("/export/:id", async (req, res) => {
     try {
 
         const item = await Inventory.findById(req.params.id);
-
-        console.log("========== EXPORT ==========");
-        console.log("ID:", req.params.id);
-        console.log("Request body:", req.body);
-        console.log("Item from DB:", item);
-
         if (!item) {
 
             return res.status(404).json({
@@ -249,9 +428,6 @@ router.put("/export/:id", async (req, res) => {
         }
 
         const stock = Number(req.body.stock);
-
-        console.log("Export stock:", stock);
-        console.log("Current stock:", item.stock);
 
         if(stock <= 0){
 
@@ -276,8 +452,7 @@ router.put("/export/:id", async (req, res) => {
 
         item.stock -= stock;
 
-        console.log("Before export:", item.stock);
-        console.log("After export:", item.stock);
+        item.status = deriveStatus(item);
 
         await item.save();
 
@@ -302,32 +477,6 @@ router.put("/export/:id", async (req, res) => {
     catch (err) {
 
         console.log(err);
-
-        res.status(500).json(err);
-
-    }
-
-});
-
-// ======================
-// GET HISTORY
-// ======================
-
-router.get("/history/all", async (req, res) => {
-
-    try {
-
-        const history =
-            await InventoryHistory.find()
-            .sort({
-                createdAt: -1
-            });
-
-        res.json(history);
-
-    }
-
-    catch (err) {
 
         res.status(500).json(err);
 

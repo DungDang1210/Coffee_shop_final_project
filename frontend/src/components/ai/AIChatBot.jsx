@@ -154,6 +154,12 @@ export default function AIChatbot({
 
   // =========================
   // SEND MESSAGE
+  //
+  // Asks the server, which scores the whole
+  // catalogue by intent (caffeine, temperature,
+  // milk, taste, price). Falls back to the local
+  // keyword search if the API is unreachable, so
+  // the bot still answers offline.
   // =========================
 
   const sendMessage = async (customText) => {
@@ -161,48 +167,82 @@ export default function AIChatbot({
     const messageText =
       customText || input;
 
-    if (!messageText.trim()) return;
-
-    const userMsg = {
-      role: "user",
-      text: messageText
-    };
+    if (!messageText.trim() || loading) return;
 
     setMessages(prev => [
       ...prev,
-      userMsg
+      {
+        role: "user",
+        text: messageText
+      }
     ]);
 
     setInput("");
+
     setLoading(true);
 
-    setTimeout(() => {
+    try {
 
-      const results =
-        smartSearch(messageText);
+      const response = await fetch(
+        "http://localhost:5000/api/ai/chat",
+        {
+          method: "POST",
 
-      let aiText =
-        "I found some recommendations for you ✨";
+          headers: {
+            "Content-Type": "application/json"
+          },
 
-      if (results.length === 0) {
+          body: JSON.stringify({
+            message: messageText
+          })
+        }
+      );
 
-        aiText =
-          "I couldn't find an exact match 😢\nTry words like:\ncoffee, sweet, strong, tea, smoothie, dessert...";
+      const data =
+        await response.json();
 
+      if (!response.ok) {
+        throw new Error(
+          data.message || "AI unavailable"
+        );
       }
 
       setMessages(prev => [
         ...prev,
         {
           role: "ai",
-          text: aiText,
+          text: data.reply,
+          products: data.products || []
+        }
+      ]);
+
+    } catch (err) {
+
+      console.log("Chat AI error:", err);
+
+      // offline fallback
+      const results =
+        smartSearch(messageText);
+
+      setMessages(prev => [
+        ...prev,
+        {
+          role: "ai",
+
+          text:
+            results.length
+              ? "I found these for you ✨"
+              : "I couldn't reach the kitchen just now 😢\nTry words like: coffee, sweet, strong, tea, smoothie, dessert...",
+
           products: results
         }
       ]);
 
+    } finally {
+
       setLoading(false);
 
-    }, 800);
+    }
 
   };
 

@@ -7,6 +7,7 @@ import ProductModal from "./menu/components/ProductModal";
 import ExcelImport from "./menu/components/ExcelImport";
 import DeleteModal from "./menu/components/DeleteModal";
 import useProductForm from "./menu/hooks/useProductForm";
+import ExcelGuide from "../../components/admin/ExcelGuide";
 
 export default function MenuManagement({
   products,
@@ -28,6 +29,12 @@ export default function MenuManagement({
 
       editProduct,
 
+      saving,
+
+      error: formError,
+
+      setError: setFormError,
+
       emptyForm
 
   } = useProductForm(setProducts, fetchProducts);
@@ -42,6 +49,8 @@ export default function MenuManagement({
 
   const [excelOpen,setExcelOpen]=useState(false);
 
+  const [guideOpen,setGuideOpen]=useState(false);
+
   const [modalOpen,setModalOpen]=useState(false);
 
   const [search,setSearch]=useState("");
@@ -54,6 +63,32 @@ export default function MenuManagement({
     };
 
   const [category,setCategory]=useState("All");
+
+  // real categories + how many products each holds,
+  // so the filter can never offer an empty option
+  const categories = [
+    ...new Set(
+      products
+        .map(p => p.category)
+        .filter(Boolean)
+    )
+  ].sort();
+
+  const counts = products.reduce(
+    (acc, p) => {
+
+      acc.All = (acc.All || 0) + 1;
+
+      if (p.category) {
+        acc[p.category] =
+          (acc[p.category] || 0) + 1;
+      }
+
+      return acc;
+
+    },
+    {}
+  );
 
   const [currentPage,setCurrentPage] = useState(1);
 
@@ -87,6 +122,19 @@ export default function MenuManagement({
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
+
+    // deleting the last row on the last page used to
+    // leave you stranded on an empty page
+    useEffect(() => {
+
+        if (
+            totalPages > 0 &&
+            currentPage > totalPages
+        ) {
+            setCurrentPage(totalPages);
+        }
+
+    }, [totalPages, currentPage]);
 
   const handleImport = async (rows) => {
 
@@ -131,11 +179,29 @@ export default function MenuManagement({
   // ======================
   // DELETE
   // ======================
+  const [deleting, setDeleting] = useState(false);
+
+  const [error, setError] = useState("");
+
   const confirmDelete = async (id) => {
+
+      if (!id) {
+
+          setError(
+            "Cannot delete: this product has no id."
+          );
+
+          return;
+
+      }
+
+      setError("");
+
+      setDeleting(true);
 
       try {
 
-          await fetch(
+          const res = await fetch(
 
               `http://localhost:5000/api/products/${id}`,
 
@@ -147,7 +213,19 @@ export default function MenuManagement({
 
           );
 
-          fetchProducts();
+          if (!res.ok) {
+
+              const body =
+                await res.json().catch(() => ({}));
+
+              throw new Error(
+                body.message ||
+                `Delete failed (HTTP ${res.status})`
+              );
+
+          }
+
+          await fetchProducts();
 
           setDeleteOpen(false);
 
@@ -158,6 +236,14 @@ export default function MenuManagement({
       catch (err) {
 
           console.log(err);
+
+          setError(err.message);
+
+      }
+
+      finally {
+
+          setDeleting(false);
 
       }
 
@@ -170,6 +256,26 @@ export default function MenuManagement({
       <h1 className="text-3xl font-bold mb-8">
         Menu Management
       </h1>
+
+      {error && (
+
+        <div
+          role="alert"
+          className="mb-6 bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-2xl flex items-start justify-between gap-4"
+        >
+
+          <span className="text-sm">{error}</span>
+
+          <button
+            onClick={() => setError("")}
+            className="text-red-500 hover:text-red-800 shrink-0"
+          >
+            ✕
+          </button>
+
+        </div>
+
+      )}
 
       <ProductStats
 
@@ -185,13 +291,20 @@ export default function MenuManagement({
             category={category}
             setCategory={setCategory}
 
+            categories={categories}
+            counts={counts}
+
             onImport={()=>setExcelOpen(true)}
+
+            onGuide={()=>setGuideOpen(true)}
 
             onAdd={()=>{
 
                 setEditingId(null);
 
                 setForm(emptyForm);
+
+                setFormError("");
 
                 setModalOpen(true);
 
@@ -332,6 +445,10 @@ export default function MenuManagement({
 
             editing={editingId}
 
+            saving={saving}
+
+            error={formError}
+
             onClose={()=>setModalOpen(false)}
 
             onSave={async () => {
@@ -358,11 +475,23 @@ export default function MenuManagement({
 
         />
 
+        <ExcelGuide
+
+            open={guideOpen}
+
+            mode="product"
+
+            onClose={()=>setGuideOpen(false)}
+
+        />
+
         <DeleteModal
 
             open={deleteOpen}
 
             product={deleteItem}
+
+            deleting={deleting}
 
             onClose={() => {
 

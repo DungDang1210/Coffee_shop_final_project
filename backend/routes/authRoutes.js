@@ -12,45 +12,12 @@ const router = express.Router();
 // AUTH MIDDLEWARE
 // ======================
 
-const authMiddleware = (req,res,next)=>{
+const authMiddleware =
+  require("../middleware/auth");
 
-    const token =
-      req.headers.authorization?.split(" ")[1];
-
-
-    if(!token){
-
-      return res.status(401).json({
-        message:"No token"
-      });
-
-    }
-
-
-    try{
-
-      const decoded =
-        jwt.verify(
-          token,
-          process.env.JWT_SECRET
-        );
-
-
-      req.user = decoded;
-
-
-      next();
-
-
-    }catch(err){
-
-      res.status(401).json({
-        message:"Invalid token"
-      });
-
-    }
-
-  };
+const {
+  WELCOME_VOUCHER
+} = require("../services/rewardsEngine");
 
 const { OAuth2Client } = require("google-auth-library");
 
@@ -67,9 +34,21 @@ router.put("/profile", authMiddleware, async(req,res)=>{
 
       const {
         name,
-        avatar
+        avatar,
+        phone
       } = req.body;
 
+
+      // only overwrite what was actually sent
+      const patch = {};
+
+      if (name !== undefined) patch.name = name;
+
+      if (avatar !== undefined) patch.avatar = avatar;
+
+      if (phone !== undefined) {
+        patch.phone = String(phone).trim();
+      }
 
 
       const user =
@@ -77,10 +56,7 @@ router.put("/profile", authMiddleware, async(req,res)=>{
 
           req.user.id,
 
-          {
-            name,
-            avatar
-          },
+          patch,
 
           {
             new:true
@@ -142,18 +118,32 @@ router.post("/register", async (req, res) => {
       await bcrypt.hash(password, 10);
 
     // create user
+    //
+    // The welcome voucher is granted here, on the
+    // server. It used to be sent from the register
+    // form and silently dropped, which is why the
+    // new-member 20% never actually existed.
     const user =
       new User({
         name,
         phone,
         email,
-        password: hashedPassword
+        password: hashedPassword,
+        isNewUser: true,
+        vouchers: [
+          {
+            ...WELCOME_VOUCHER,
+            used: false,
+            grantedAt: new Date()
+          }
+        ]
       });
 
     await user.save();
 
     res.json({
-      message: "Register successful"
+      message: "Register successful",
+      welcomeVoucher: WELCOME_VOUCHER
     });
 
   } catch (err) {
@@ -265,7 +255,15 @@ router.post("/google", async (req, res) => {
 
         favorites: [],
 
-        vouchers: [],
+        // new Google members get the welcome
+        // voucher too
+        vouchers: [
+          {
+            ...WELCOME_VOUCHER,
+            used: false,
+            grantedAt: new Date()
+          }
+        ],
 
         isNewUser: true
 

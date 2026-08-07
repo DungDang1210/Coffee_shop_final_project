@@ -3,7 +3,8 @@ import ProductCard from "../../components/product/ProductCard";
 import { Link } from "react-router-dom";
 import PersonalizedAI from "../../components/ai/PersonalizedAI";
 import PromoBanner from "../../components/home/PromoBanner";
-import { useState } from "react";
+import useMemberRewards from "../../hooks/useMemberRewards";
+import { useState, useEffect } from "react";
 
 export default function Home({
   products = [],
@@ -41,6 +42,100 @@ export default function Home({
   const [currentSlide, setCurrentSlide] =
     useState(0);
 
+  // guests and new members can still use the
+  // first-order offer; existing customers cannot
+  const { welcomeVoucher } =
+    useMemberRewards(user);
+
+  const showWelcomeOffer =
+    !user || Boolean(welcomeVoucher);
+
+  // =========================
+  // RELATED PICKS
+  //
+  // PersonalizedAI already analysed the taste
+  // profile; the same call returns the next best
+  // matches, so this row is genuinely related
+  // instead of products.slice(0, 3).
+  // =========================
+  const [related, setRelated] = useState([]);
+
+  const [relatedFrom, setRelatedFrom] =
+    useState("signature");
+
+  useEffect(() => {
+
+    let cancelled = false;
+
+    const token =
+      localStorage.getItem("token");
+
+    fetch(
+      "http://localhost:5000/api/ai/recommend",
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+          ...(
+            token
+              ? { Authorization: `Bearer ${token}` }
+              : {}
+          )
+        },
+
+        body: JSON.stringify({
+          userId: user?._id || "guest"
+        })
+      }
+    )
+
+      .then(res => res.json())
+
+      .then(data => {
+
+        if (cancelled) return;
+
+        if (Array.isArray(data?.related) && data.related.length) {
+
+          setRelated(data.related);
+
+          setRelatedFrom(data.basedOn || "signature");
+
+        }
+
+      })
+
+      .catch(err =>
+        console.log("Related picks failed:", err)
+      );
+
+    return () => {
+      cancelled = true;
+    };
+
+  }, [user?._id]);
+
+  // fall back to house favourites if the AI has
+  // nothing to say
+  const relatedPicks =
+    related.length
+      ? related
+      : products
+          .filter(p => p.bestSeller || p.signature)
+          .slice(0, 6);
+
+  // Best sellers, rating cao nhất trước.
+  // 6 món = 2 hàng grid gọn gàng.
+  const bestSellers = products
+    .filter(p => p.bestSeller)
+    .sort(
+      (a, b) =>
+        (Number(b.rating) || 0) -
+        (Number(a.rating) || 0)
+    )
+    .slice(0, 6);
+
   return (
     <>
       <Navbar
@@ -50,7 +145,10 @@ export default function Home({
       />
 
       {/* HERO */}
-      <PromoBanner user={user} />
+      <PromoBanner
+        user={user}
+        showToast={showToast}
+      />
 
       <section
         className="relative h-[80vh] flex items-center justify-center bg-cover bg-center"
@@ -92,57 +190,48 @@ export default function Home({
         showToast={showToast}
       />
 
-      {/* CATEGORIES */}
-      <section className="bg-[#efe7de] py-16">
-
-        <div className="max-w-7xl mx-auto px-10">
-
-          <h2 className="text-3xl font-bold mb-8 text-center">
-            Explore Our Categories
-          </h2>
-
-          <div className="grid md:grid-cols-3 gap-6">
-
-            {["Coffee", "Tea", "Dessert"].map(cat => (
-
-              <div
-                key={cat}
-                className="bg-white rounded-2xl p-8 text-center shadow hover:shadow-lg transition"
-              >
-
-                <h3 className="text-2xl font-semibold mb-2">
-                  {cat}
-                </h3>
-
-                <p className="text-gray-500">
-                  Premium {cat.toLowerCase()} crafted daily
-                </p>
-
-              </div>
-
-            ))}
-
-          </div>
-
-        </div>
-
-      </section>
-
       {/* MAIN CONTENT */}
       <section className="bg-[#fcfaf8] py-16">
 
         <div className="max-w-7xl mx-auto px-10">
 
-          {/* AI Recommendations */}
+          {/* RELATED PICKS */}
           <div className="bg-[#f8f3ef] rounded-3xl p-8 mb-14">
 
-            <h2 className="text-2xl font-semibold mb-6">
-              Recommended for you 🤖
-            </h2>
+            <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
 
-            <div className="grid md:grid-cols-3 gap-6">
+              <div>
 
-              {products.slice(0, 3).map(product => (
+                <h2 className="text-2xl font-semibold">
+                  {
+                    relatedFrom === "history"
+                      ? "More like what you order 🤖"
+                      : "Popular right now ✨"
+                  }
+                </h2>
+
+                <p className="text-gray-500 text-sm mt-1">
+                  {
+                    relatedFrom === "history"
+                      ? "Matched to your taste profile — different drinks, same flavour direction."
+                      : "House signatures and best sellers. Order a few times and this becomes personal."
+                  }
+                </p>
+
+              </div>
+
+              <Link
+                to="/menu"
+                className="text-[#6b4f4f] font-semibold hover:underline whitespace-nowrap"
+              >
+                See full menu →
+              </Link>
+
+            </div>
+
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+              {relatedPicks.slice(0, 6).map(product => (
 
                 <ProductCard
                   key={product._id}
@@ -158,53 +247,101 @@ export default function Home({
 
           </div>
 
-          {/* PROMO */}
-          <section className="mb-14">
+          {/* BEST SELLERS */}
+          {bestSellers.length > 0 && (
 
-            <div className="bg-[#6b4f4f] rounded-3xl p-10 text-white flex flex-col md:flex-row justify-between items-center">
+            <div className="mb-14">
 
-              <div>
+              <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
 
-                <h2 className="text-3xl font-bold mb-2">
-                  20% OFF First Order 🎉
-                </h2>
+                <div>
 
-                <p className="text-gray-200">
-                  Sign up today and enjoy exclusive discounts.
-                </p>
+                  <p className="uppercase tracking-[4px] text-[#c08b5c] text-sm font-semibold">
+                    Customer favourites
+                  </p>
+
+                  <h2 className="text-3xl font-bold text-[#2d1e1e]">
+                    Best Sellers 🔥
+                  </h2>
+
+                </div>
+
+                <Link
+                  to="/menu"
+                  className="text-[#6b4f4f] font-semibold hover:underline whitespace-nowrap"
+                >
+                  See full menu →
+                </Link>
 
               </div>
 
-              <Link
-                to="/promotions"
-                className="mt-4 md:mt-0 bg-[#c08b5c] px-6 py-3 rounded-full font-semibold hover:bg-[#a87246] transition"
-              >
-                Claim Offer
-              </Link>
+              {/* Grid, cùng kiểu với hàng gợi ý phía trên.
+                  Trước đây thử rail cuộn ngang nhưng bọc
+                  ProductCard trong div min-w cố định làm
+                  vỡ layout của card. */}
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+                {bestSellers.map(product => (
+
+                  <ProductCard
+                    key={product._id}
+                    product={product}
+                    favorites={favorites}
+                    setFavorites={setFavorites}
+                    showToast={showToast}
+                  />
+
+                ))}
+
+              </div>
 
             </div>
 
-          </section>
+          )}
 
-          {/* MENU CTA */}
-          <section className="bg-white rounded-3xl p-8 shadow-sm text-center">
+          {/* FIRST-ORDER PROMO
+              Only for people who can still use it:
+              signed-out visitors and brand new
+              members. Existing customers never see
+              it — the offer is first-order only. */}
+          {showWelcomeOffer && (
 
-            <h2 className="text-3xl font-bold mb-4">
-              Explore Our Full Menu
-            </h2>
+            <section className="mb-14">
 
-            <p className="text-gray-600 mb-6">
-              Browse our complete handcrafted coffee and dessert collection.
-            </p>
+              <div className="bg-[#6b4f4f] rounded-3xl p-10 text-white flex flex-col md:flex-row justify-between items-center gap-6">
 
-            <Link
-              to="/menu"
-              className="inline-block bg-[#6b4f4f] text-white px-8 py-3 rounded-full hover:bg-[#5a3f3f] transition"
-            >
-              View Full Menu
-            </Link>
+                <div>
 
-          </section>
+                  <h2 className="text-3xl font-bold mb-2">
+                    20% OFF First Order 🎉
+                  </h2>
+
+                  <p className="text-gray-200">
+                    {
+                      user
+                        ? "Your welcome voucher is waiting — use it on your first order."
+                        : "Sign up today and your first drink is 20% off."
+                    }
+                  </p>
+
+                </div>
+
+                <Link
+                  to={user ? "/promotions" : "/register"}
+                  className="bg-[#c08b5c] px-6 py-3 rounded-full font-semibold hover:bg-[#a87246] transition whitespace-nowrap"
+                >
+                  {
+                    user
+                      ? "View my voucher"
+                      : "Claim Offer"
+                  }
+                </Link>
+
+              </div>
+
+            </section>
+
+          )}
 
         </div>
 

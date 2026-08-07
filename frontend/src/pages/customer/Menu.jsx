@@ -1,7 +1,21 @@
 import Navbar from "../../components/common/Navbar";
 import ProductCard from "../../components/product/ProductCard";
 import HeroSlider from "../../components/home/HeroSlider";
-import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
+
+import {
+  DRINK_CATEGORIES as DRINK_CATS,
+  FOOD_CATEGORIES
+} from "../admin/menu/utils/menuConstants";
+
+const VIETNAMESE = "⭐ Vietnamese Coffee";
+
+// the Vietnamese filter is a subcategory, the rest
+// are real categories
+const DRINK_CATEGORIES = [
+  VIETNAMESE,
+  ...DRINK_CATS
+];
 
 export default function Menu({
   products = [],
@@ -14,27 +28,32 @@ export default function Menu({
   showToast
 }) {
 
-  const [mainCategory, setMainCategory] =
-    useState("All");
+  // The selected category lives in the URL, so
+  // going into a product and pressing Back returns
+  // you to the same list instead of resetting to
+  // "All Menu".
+  const [searchParams, setSearchParams] =
+    useSearchParams();
 
-  // =========================
-  // CATEGORIES
-  // =========================
+  const mainCategory =
+    searchParams.get("category") || "All";
 
-  const DRINK_CATEGORIES = [
-    "⭐ Vietnamese Coffee",
-    "Coffee",
-    "Tea",
-    "Smoothie",
-    "Juice",
-    "Soda",
-    "Dessert Drink"
-  ];
+  const setMainCategory = (category) => {
 
-  const FOOD_CATEGORIES = [
-    "Sweet",
-    "Bakery"
-  ];
+    const next = new URLSearchParams(searchParams);
+
+    if (category === "All") {
+      next.delete("category");
+    } else {
+      next.set("category", category);
+    }
+
+    // replace, not push: browsing categories should
+    // not fill the history with entries you have to
+    // click back through
+    setSearchParams(next, { replace: true });
+
+  };
 
   // =========================
   // FILTER
@@ -44,8 +63,39 @@ export default function Menu({
     product =>
       mainCategory === "All" ||
       product.category === mainCategory
-      || (mainCategory === "⭐ Vietnamese Coffee" && product.subcategory === "Vietnamese Coffee")
+      || (mainCategory === VIETNAMESE && product.subcategory === "Vietnamese Coffee")
   );
+
+  // Best sellers, rating cao nhất trước.
+  // 6 món = 2 hàng grid gọn gàng. Trước là 3
+  // (quá ít), rồi thử hiện hết 23 món dạng rail
+  // cuộn ngang (làm vỡ ProductCard).
+  const bestSellers = products
+    .filter(p => p.bestSeller)
+    .sort(
+      (a, b) =>
+        (Number(b.rating) || 0) -
+        (Number(a.rating) || 0)
+    )
+    .slice(0, 6);
+
+  // how many drinks sit behind each button, so an
+  // empty category is obvious before you click it
+  const countFor = (category) => {
+
+    if (category === VIETNAMESE) {
+
+      return products.filter(
+        p => p.subcategory === "Vietnamese Coffee"
+      ).length;
+
+    }
+
+    return products.filter(
+      p => p.category === category
+    ).length;
+
+  };
 
   return (
     <>
@@ -99,13 +149,25 @@ export default function Menu({
                       onClick={() =>
                         setMainCategory(cat)
                       }
-                      className={`text-left px-4 py-3 rounded-xl transition ${
+                      className={`text-left px-4 py-3 rounded-xl transition flex justify-between items-center gap-2 ${
                         mainCategory === cat
                           ? "bg-[#6b4f4f] text-white"
                           : "hover:bg-[#f3ece5]"
                       }`}
                     >
-                      {cat}
+
+                      <span>{cat}</span>
+
+                      <span
+                        className={
+                          mainCategory === cat
+                            ? "text-white/70 text-sm"
+                            : "text-gray-400 text-sm"
+                        }
+                      >
+                        {countFor(cat)}
+                      </span>
+
                     </button>
 
                   ))}
@@ -130,13 +192,25 @@ export default function Menu({
                       onClick={() =>
                         setMainCategory(cat)
                       }
-                      className={`text-left px-4 py-3 rounded-xl transition ${
+                      className={`text-left px-4 py-3 rounded-xl transition flex justify-between items-center gap-2 ${
                         mainCategory === cat
                           ? "bg-[#6b4f4f] text-white"
                           : "hover:bg-[#f3ece5]"
                       }`}
                     >
-                      {cat}
+
+                      <span>{cat}</span>
+
+                      <span
+                        className={
+                          mainCategory === cat
+                            ? "text-white/70 text-sm"
+                            : "text-gray-400 text-sm"
+                        }
+                      >
+                        {countFor(cat)}
+                      </span>
+
                     </button>
 
                   ))}
@@ -163,23 +237,28 @@ export default function Menu({
                     Best Sellers ✨
                   </h2>
 
+                  <p className="text-gray-500 mt-1">
+                    {bestSellers.length} most-loved drinks
+                  </p>
+
                 </div>
 
+                {/* Grid, cùng kiểu với danh sách sản phẩm
+                    bên dưới. Trước đây thử rail cuộn ngang
+                    nhưng bọc ProductCard trong div min-w
+                    cố định làm vỡ layout của card. */}
                 <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-8">
 
-                  {products
-                    .filter(product => product.bestSeller)
-                    .slice(0, 3)
-                    .map(product => (
+                  {bestSellers.map(product => (
 
-                      <ProductCard
-                        key={product._id}
-                        product={product}
-                        user={user}
-                        favorites={favorites}
-                        setFavorites={setFavorites}
-                        showToast={showToast}
-                      />
+                    <ProductCard
+                      key={product._id}
+                      product={product}
+                      user={user}
+                      favorites={favorites}
+                      setFavorites={setFavorites}
+                      showToast={showToast}
+                    />
 
                   ))}
 

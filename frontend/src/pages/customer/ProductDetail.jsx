@@ -6,6 +6,10 @@ import {
 
 import { useState } from "react";
 
+import { Star } from "lucide-react";
+
+import ProductReviews from "../../components/product/ProductReviews";
+
 export default function ProductDetail({
 
     products,
@@ -211,9 +215,22 @@ export default function ProductDetail({
 
       <div className="max-w-6xl mx-auto">
 
-        {/* BACK */}
+        {/* BACK
+            navigate(-1) returns to the menu with the
+            category still selected, because Menu keeps
+            it in the URL. location.key === "default"
+            means this was opened directly, so there is
+            nothing to go back to. */}
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => {
+
+            if (location.key === "default") {
+              navigate("/menu");
+            } else {
+              navigate(-1);
+            }
+
+          }}
           className="mb-8 text-[#6b4f4f] font-semibold hover:underline"
         >
           ← Back
@@ -259,13 +276,37 @@ export default function ProductDetail({
                 In Stock
               </span>
 
-              <span className="text-yellow-500 font-medium">
-                ★ {product.rating || 4.8}
-              </span>
+              {/* real rating from the Review
+                  collection, not a hard-coded 4.8 */}
+              {product.reviewCount > 0 ? (
 
-              <span className="text-gray-500 text-sm">
-                ({product.reviewCount || 124} Reviews)
-              </span>
+                <a
+                  href="#reviews"
+                  className="flex items-center gap-1.5 hover:underline"
+                >
+
+                  <Star
+                    size={16}
+                    className="fill-yellow-400 text-yellow-400"
+                  />
+
+                  <span className="font-medium text-[#2d1e1e]">
+                    {product.rating}
+                  </span>
+
+                  <span className="text-gray-500 text-sm">
+                    ({product.reviewCount} reviews)
+                  </span>
+
+                </a>
+
+              ) : (
+
+                <span className="text-gray-400 text-sm">
+                  No reviews yet
+                </span>
+
+              )}
 
             </div>
 
@@ -513,6 +554,16 @@ export default function ProductDetail({
             </button>
 
           </div>
+
+        </div>
+
+        {/* REVIEWS */}
+        <div id="reviews" className="scroll-mt-6">
+
+          <ProductReviews
+            productId={product._id}
+            user={user}
+          />
 
         </div>
 

@@ -25,9 +25,39 @@ export default function OrderHistory({
   const [expandedOrder, setExpandedOrder] =
     useState(null);
 
+  // id of the order currently being cancelled
+  const [cancellingId, setCancellingId] =
+    useState(null);
+
+  const [actionError, setActionError] =
+    useState("");
+
   const userOrders = orders.filter(order =>
     String(order.userId) === String(user?._id)
   );
+
+  // =========================
+  // WHAT THE CUSTOMER MAY DO
+  //
+  // Once the shop starts making the drinks
+  // the order is locked: no cancelling, and
+  // no reordering (it would double up).
+  // =========================
+  const IN_PROGRESS = [
+    "Preparing",
+    "Delivering"
+  ];
+
+  const canCancel = (status) =>
+    status === "Pending";
+
+  const canReorder = (status) =>
+    !IN_PROGRESS.includes(status);
+
+  const lockReason = (status) =>
+    IN_PROGRESS.includes(status)
+      ? `Your order is already ${status.toLowerCase()} — it can no longer be changed.`
+      : "";
 
   const formatPrice = (price) => {
 
@@ -141,7 +171,15 @@ export default function OrderHistory({
 
     setCart(updatedCart);
 
-    showToast?.("Items added to cart");
+    // remember this is a repeat, so checkout can
+    // flag the new order and the admin sees
+    // "Reorder" next to it
+    localStorage.setItem(
+      "reorderOf",
+      order._id
+    );
+
+    showToast?.("Items added to cart — reorder ready");
 
     navigate("/cart");
 
@@ -156,11 +194,18 @@ export default function OrderHistory({
 
     if(!confirmCancel) return;
 
+    setActionError("");
+
+    setCancellingId(orderId);
+
     try{
+
+      const token =
+        localStorage.getItem("token");
 
       const res = await fetch(
 
-        `http://localhost:5000/api/orders/${orderId}`,
+        `http://localhost:5000/api/orders/${orderId}/cancel`,
 
         {
 
@@ -168,36 +213,57 @@ export default function OrderHistory({
 
           headers:{
               "Content-Type":"application/json",
-              ...authHeaders()
-          },
 
-          body:JSON.stringify({
-
-            status:"Cancelled"
-
-          })
+              ...(
+                token
+                  ? { Authorization: `Bearer ${token}` }
+                  : {}
+              )
+          }
 
         }
 
       );
-      
+
+      const updatedOrder =
+        await res.json().catch(() => null);
+
       if(!res.ok){
-          throw new Error("Cancel failed");
+
+          throw new Error(
+            updatedOrder?.error ||
+            "Could not cancel this order."
+          );
+
       }
 
-      const updated = orders.map(order =>
+      // trust the server's copy of the order
+      setOrders(
+        orders.map(order =>
           order._id === orderId
-              ? { ...order, status: "Cancelled" }
-              : order
+            ? (updatedOrder || {
+                ...order,
+                status: "Cancelled"
+              })
+            : order
+        )
       );
 
-      setOrders(updated);
+      showToast?.("Order cancelled");
 
     }
 
     catch(err){
 
       console.log(err);
+
+      setActionError(err.message);
+
+    }
+
+    finally{
+
+      setCancellingId(null);
 
     }
 
@@ -207,11 +273,15 @@ export default function OrderHistory({
     <div className="min-h-screen bg-[#fcfaf8] py-10 px-6">
       <div className="max-w-6xl mx-auto">
 
+        {/* Back to the menu, not navigate(-1):
+            you usually arrive here from Success or the
+            navbar, and going "back" to a payment
+            screen is not useful. */}
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate("/menu")}
           className="mb-8 text-[#6b4f4f] font-semibold hover:underline"
         >
-          ← Back
+          ← Back to Menu
         </button>
 
         <div className="mb-10">
@@ -223,6 +293,27 @@ export default function OrderHistory({
             Review your recent coffee purchases and track order progress.
           </p>
         </div>
+
+        {/* ACTION ERROR */}
+        {actionError && (
+
+          <div
+            role="alert"
+            className="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-2xl"
+          >
+
+            <XCircle
+              size={18}
+              className="shrink-0 mt-0.5"
+            />
+
+            <span className="text-sm">
+              {actionError}
+            </span>
+
+          </div>
+
+        )}
 
         {userOrders.length===0 ? (
           <div className="bg-white rounded-3xl shadow-sm border border-[#eee] p-16 text-center">
@@ -287,9 +378,37 @@ export default function OrderHistory({
                     </div>
                   </div>
 
+                  {/* CANCELLED NOTICE */}
+                  {order.status === "Cancelled" && (
+
+                    <div className="mx-8 mt-6 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-4">
+
+                      <XCircle
+                        size={18}
+                        className="shrink-0"
+                      />
+
+                      <span className="text-sm">
+                        {
+                          order.cancelledBy === "admin"
+                            ? "The shop cancelled this order. Please contact us if you were charged."
+                            : "You cancelled this order. Nothing was prepared and you were not charged."
+                        }
+                      </span>
+
+                    </div>
+
+                  )}
+
                   <div className="px-8 pt-6">
-                    
-                    <div className="flex items-center justify-between gap-2">
+
+                    <div
+                      className={`flex items-center justify-between gap-2 ${
+                        order.status === "Cancelled"
+                          ? "opacity-40"
+                          : ""
+                      }`}
+                    >
                       {orderStages.map((stage, index) => {
                         const currentIndex =
                           order.status === "Cancelled"
@@ -489,44 +608,47 @@ export default function OrderHistory({
 
                       <button
                         onClick={() => handleReorder(order)}
-                        className="flex items-center gap-2 bg-[#6b4f4f] text-white px-5 py-2 rounded-xl hover:bg-[#5a3f3f] transition"
+                        disabled={!canReorder(order.status)}
+                        title={lockReason(order.status)}
+                        className={`flex items-center gap-2 px-5 py-2 rounded-xl transition ${
+                          canReorder(order.status)
+                            ? "bg-[#6b4f4f] text-white hover:bg-[#5a3f3f]"
+                            : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                        }`}
                       >
                         <RotateCcw size={16} />
                         Reorder
                       </button>
-                      {order.status==="Pending" && (
 
-                      <button
+                      {canCancel(order.status) && (
 
-                          onClick={()=>
+                        <button
+                          onClick={() =>
+                            handleCancelOrder(order._id)
+                          }
+                          disabled={
+                            cancellingId === order._id
+                          }
+                          className="bg-red-500 hover:bg-red-600 disabled:bg-red-300 disabled:cursor-not-allowed text-white px-5 py-2 rounded-xl transition"
+                        >
 
-                              handleCancelOrder(order._id)
-
+                          {
+                            cancellingId === order._id
+                              ? "Cancelling..."
+                              : "Cancel"
                           }
 
-                          className="
+                        </button>
 
-                          bg-red-500
+                      )}
 
-                          hover:bg-red-600
+                      {IN_PROGRESS.includes(order.status) && (
 
-                          text-white
+                        <span className="text-sm text-gray-500">
+                          {lockReason(order.status)}
+                        </span>
 
-                          px-5
-
-                          py-2
-
-                          rounded-xl
-
-                          "
-
-                      >
-
-                          Cancel
-
-</button>
-
-)}
+                      )}
                     </div>
                   </div>
                 </div>

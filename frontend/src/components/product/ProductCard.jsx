@@ -14,24 +14,13 @@ export default function ProductCard({
     item => item._id === product._id
   );
 
-  const rating =
-    Number.isFinite(
-      Number(product.rating)
-    )
-    ?
-    Number(product.rating)
-    :
-    4.8;
-
+  // real values from the Review collection —
+  // no more inventing "4.8 (124 reviews)" for
+  // a drink nobody has reviewed
+  const rating = Number(product.rating) || 0;
 
   const reviewCount =
-    Number.isFinite(
-      Number(product.reviewCount)
-    )
-    ?
-    Number(product.reviewCount)
-    :
-    124;
+    Number(product.reviewCount) || 0;
 
   const toggleFavorite = () => {
 
@@ -142,25 +131,39 @@ export default function ProductCard({
         </div>
 
         {/* RATING */}
-        <div className="flex items-center gap-1 mb-4">
+        <div className="flex items-center gap-1 mb-4 min-h-[24px]">
 
-          {[...Array(5)].map((_, i) => (
+          {reviewCount > 0 ? (
 
-            <Star
-              key={i}
-              size={18}
-              className={
-                i < Math.round(rating) 
-                  ? "fill-yellow-400 text-yellow-400"
-                  : "text-gray-300"
-              }
-            />
+            <>
 
-          ))}
+              {[...Array(5)].map((_, i) => (
 
-          <span className="text-sm text-gray-500 ml-2">
-            ({reviewCount} reviews)
-          </span>
+                <Star
+                  key={i}
+                  size={18}
+                  className={
+                    i < Math.round(rating)
+                      ? "fill-yellow-400 text-yellow-400"
+                      : "text-gray-300"
+                  }
+                />
+
+              ))}
+
+              <span className="text-sm text-gray-500 ml-2">
+                {rating} ({reviewCount})
+              </span>
+
+            </>
+
+          ) : (
+
+            <span className="text-sm text-gray-400">
+              No reviews yet
+            </span>
+
+          )}
 
         </div>
 

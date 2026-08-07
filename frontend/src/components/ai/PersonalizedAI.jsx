@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { Brain, TrendingUp } from "lucide-react";
+import { Link } from "react-router-dom";
+import {
+  Brain,
+  TrendingUp,
+  LoaderCircle,
+  Sparkles
+} from "lucide-react";
 
 export default function PersonalizedAI({
   user,
@@ -7,21 +13,14 @@ export default function PersonalizedAI({
   setCart,
   showToast
 }) {
-  const token = localStorage.getItem("token");
-
-  const authHeaders = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`
-  };
-
-  fetch("http://localhost:5000/api/ai/...", {
-      headers: authHeaders
-  })
 
   const [
     recommendation,
     setRecommendation
   ] = useState(null);
+
+  const [loading, setLoading] =
+    useState(false);
 
   // ============================
   // LOAD AI PERSONALIZATION
@@ -29,56 +28,65 @@ export default function PersonalizedAI({
   useEffect(()=>{
 
     if(!user?._id){
+
+      setRecommendation(null);
+
       return;
+
     }
 
-    const fetchAI =
-      async()=>{
+    let cancelled = false;
 
-        try{
+    setLoading(true);
 
-          const response =
-            await fetch(
-              "http://localhost:5000/api/ai/recommend",
-              {
+    const token =
+      localStorage.getItem("token");
 
-                method:"POST",
+    fetch(
+      "http://localhost:5000/api/ai/recommend",
+      {
+        method: "POST",
 
-                headers:{
+        headers: {
+          "Content-Type": "application/json",
+          ...(
+            token
+              ? { Authorization: `Bearer ${token}` }
+              : {}
+          )
+        },
 
-                  "Content-Type": "application/json",
-                  ...authHeaders()
+        body: JSON.stringify({
+          userId: user._id
+        })
+      }
+    )
 
-                },
+      .then(res => res.json())
 
-                body: JSON.stringify({})
+      .then(data => {
 
-              }
+        if (cancelled) return;
 
-            );
-
-          const data =
-            await response.json();
-
-          if(data.product){
-
-              setRecommendation(data);
-
-          }
-
+        if (data?.product) {
+          setRecommendation(data);
         }
 
-        catch(error){
-          console.log(
-            "AI Error:",
-            error
-          );
+      })
 
-        }
+      .catch(error =>
+        console.log("AI Error:", error)
+      )
 
-      };
+      .finally(() => {
 
-    fetchAI();
+        if (!cancelled) setLoading(false);
+
+      });
+
+    return () => {
+      cancelled = true;
+    };
 
   },[user?._id]);
 
@@ -160,12 +168,42 @@ export default function PersonalizedAI({
   };
 
   // ============================
+  // LOADING
+  // ============================
+
+  if(loading && !recommendation){
+
+    return (
+
+      <section className="mb-14">
+
+        <div className="bg-gradient-to-r from-[#fffaf5] to-[#f3e9df] p-8 rounded-3xl border shadow-sm flex items-center gap-3 text-gray-500">
+
+          <LoaderCircle
+            size={18}
+            className="animate-spin"
+          />
+
+          Reading your taste profile...
+
+        </div>
+
+      </section>
+
+    );
+
+  }
+
+  // ============================
   // NO DATA
   // ============================
 
   if(!recommendation || !recommendation.product){
     return null;
   }
+
+  const fromHistory =
+    recommendation.basedOn === "history";
 
   return (
 
@@ -195,7 +233,11 @@ export default function PersonalizedAI({
 
             <p className="text-gray-500 text-sm">
 
-              AI personalized drink based on your taste
+              {
+                fromHistory
+                  ? `Matched against ${recommendation.ordersAnalyzed} of your past orders`
+                  : "A house signature to get you started"
+              }
 
             </p>
 
@@ -225,25 +267,42 @@ export default function PersonalizedAI({
 
           <div className="flex-1">
 
-            <div className=" flex items-center gap-2 text-[#c08b5c] mb-2">
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
 
-              <TrendingUp size={16}/>
+              <span className="flex items-center gap-2 text-[#c08b5c]">
 
-              <span className="text-sm font-semibold">
+                <TrendingUp size={16}/>
 
-                AI Match
+                <span className="text-sm font-semibold">
+                  AI Match
+                </span>
 
               </span>
 
+              {fromHistory && recommendation.score > 0 && (
+
+                <span className="inline-flex items-center gap-1 bg-[#f3e2d0] text-[#8a5f34] text-xs font-bold px-2.5 py-1 rounded-full">
+
+                  <Sparkles size={12} />
+
+                  {recommendation.score} pt match
+
+                </span>
+
+              )}
+
             </div>
 
-            <h3 className="text-2xl font-bold">
+            <Link
+              to={`/product/${recommendation.product._id}`}
+              className="text-2xl font-bold hover:text-[#6b4f4f] transition"
+            >
 
               {
                 recommendation.product.name
               }
 
-            </h3>
+            </Link>
 
             <p className="text-gray-600 mt-2">
 

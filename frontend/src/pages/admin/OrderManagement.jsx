@@ -3,50 +3,57 @@ import {
   CheckCircle2,
   XCircle,
   Coffee,
-  Truck
+  Truck,
+  Bell,
+  RefreshCw,
+  RotateCcw,
+  Ban
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import { authHeaders }  from "../../utils/auth";
 
 export default function OrderManagement({
   orders = [],
   setOrders
 }) {
-  useEffect(()=>{
 
-    const loadOrders = async()=>{
+  // the dashboard shell polls /api/orders for all
+  // admin pages, so this page no longer fetches
+  // separately
+  const {
+    newOrders = [],
+    newOrderCount = 0,
+    cancelledOrders = [],
+    refreshing,
+    lastSyncedAt,
+    refresh,
+    markOrdersViewed
+  } = useOutletContext() || {};
 
+  const [dismissed, setDismissed] =
+    useState(false);
 
-      try{
+  const [filter, setFilter] = useState("All");
 
+  const [updatingId, setUpdatingId] =
+    useState(null);
 
-        const res = await fetch(
-          "http://localhost:5000/api/orders",
-          { headers: authHeaders() }
-        );
+  const [error, setError] = useState("");
 
+  // ids that arrived while this page was open
+  const newIds = new Set(
+    newOrders.map(o => o._id)
+  );
 
-        const data = await res.json();
+  // a fresh batch resets the banner
+  useEffect(() => {
 
+    if (newOrderCount > 0) {
+      setDismissed(false);
+    }
 
-        setOrders(data);
-
-
-      }
-      catch(err){
-
-        console.log(err);
-
-      }
-
-
-    };
-
-
-    loadOrders();
-
-
-  },[]);
+  }, [newOrderCount]);
 
   const formatPrice = (price)=>{
 
@@ -56,6 +63,22 @@ export default function OrderManagement({
 
   };
 
+  // staff already know about their own cancels
+  const customerCancelled = cancelledOrders.filter(
+    o => o.cancelledBy !== "admin"
+  );
+
+  // newest first, then filtered by status
+  const visibleOrders = [...orders]
+    .sort((a, b) =>
+      new Date(b.createdAt || 0) -
+      new Date(a.createdAt || 0)
+    )
+    .filter(order =>
+      filter === "All" ||
+      order.status === filter
+    );
+
   // ======================
   // UPDATE STATUS
   // ======================
@@ -63,6 +86,10 @@ export default function OrderManagement({
     id,
     newStatus
   ) => {
+
+    setError("");
+
+    setUpdatingId(id);
 
     try {
 
@@ -83,12 +110,21 @@ export default function OrderManagement({
       );
 
       const updatedOrder =
-        await response.json();
+        await response.json().catch(() => null);
+
+      if (!response.ok) {
+
+        throw new Error(
+          updatedOrder?.error ||
+          "Failed to update order"
+        );
+
+      }
 
       setOrders(prev =>
         prev.map(order =>
           order._id === id
-            ? updatedOrder
+            ? (updatedOrder || order)
             : order
         )
       );
@@ -97,7 +133,11 @@ export default function OrderManagement({
 
       console.log(err);
 
-      alert("Failed to update order");
+      setError(err.message);
+
+    } finally {
+
+      setUpdatingId(null);
 
     }
 
@@ -190,20 +230,194 @@ export default function OrderManagement({
       <div className="max-w-7xl mx-auto">
 
         {/* HEADER */}
-        <div className="mb-10">
+        <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
 
-          <h1 className="text-4xl font-bold text-[#2d1e1e]">
-            Order Management
-          </h1>
+          <div>
 
-          <p className="text-gray-500 mt-2">
-            Track and manage customer orders.
-          </p>
+            <h1 className="text-4xl font-bold text-[#2d1e1e]">
+              Order Management
+            </h1>
+
+            <p className="text-gray-500 mt-2">
+              Live feed — cancellations and reorders
+              from customers appear here automatically.
+            </p>
+
+          </div>
+
+          <button
+            onClick={refresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 border border-[#ddd] bg-white px-4 py-2.5 rounded-xl hover:bg-gray-50 disabled:opacity-60 transition"
+          >
+
+            <RefreshCw
+              size={16}
+              className={refreshing ? "animate-spin" : ""}
+            />
+
+            {
+              lastSyncedAt
+                ? lastSyncedAt.toLocaleTimeString("vi-VN")
+                : "Refresh"
+            }
+
+          </button>
+
+        </div>
+
+        {/* NEW ORDER ALERT */}
+        {newOrderCount > 0 && !dismissed && (
+
+          <div
+            role="alert"
+            className="mb-6 bg-[#fff8e6] border-2 border-amber-300 rounded-2xl px-6 py-5 flex flex-wrap items-center justify-between gap-4"
+          >
+
+            <div className="flex items-center gap-4">
+
+              <div className="w-12 h-12 rounded-full bg-amber-400 text-white flex items-center justify-center animate-pulse shrink-0">
+
+                <Bell size={22} />
+
+              </div>
+
+              <div>
+
+                <p className="font-bold text-amber-900 text-lg">
+                  {newOrderCount} new order
+                  {newOrderCount === 1 ? "" : "s"} came in
+                </p>
+
+                <p className="text-sm text-amber-800">
+                  {
+                    newOrders
+                      .slice(0, 3)
+                      .map(o =>
+                        `#${o._id?.slice(-6).toUpperCase()}`
+                      )
+                      .join(", ")
+                  }
+                  {newOrderCount > 3 && " and more"}
+                  {" — start preparing them."}
+                </p>
+
+              </div>
+
+            </div>
+
+            <button
+              onClick={() => {
+                markOrdersViewed?.();
+                setDismissed(true);
+              }}
+              className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-semibold transition"
+            >
+              Mark as seen
+            </button>
+
+          </div>
+
+        )}
+
+        {/* CUSTOMER CANCELLED ALERT
+            only the ones the CUSTOMER cancelled are
+            news to the kitchen — staff already know
+            about their own cancellations */}
+        {customerCancelled.length > 0 && (
+
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-2xl px-6 py-4 flex items-center gap-3">
+
+            <Ban
+              size={18}
+              className="text-red-600 shrink-0"
+            />
+
+            <p className="text-sm text-red-800">
+
+              <strong>
+                {customerCancelled.length} order
+                {customerCancelled.length === 1 ? "" : "s"}
+              </strong>{" "}
+              cancelled by customers — do not prepare{" "}
+              {
+                customerCancelled
+                  .slice(0, 4)
+                  .map(o =>
+                    `#${o._id?.slice(-6).toUpperCase()}`
+                  )
+                  .join(", ")
+              }
+              {customerCancelled.length > 4 && " …"}
+
+            </p>
+
+          </div>
+
+        )}
+
+        {/* ERROR */}
+        {error && (
+
+          <div
+            role="alert"
+            className="mb-6 bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-2xl flex items-start justify-between gap-4"
+          >
+
+            <span className="text-sm">{error}</span>
+
+            <button
+              onClick={() => setError("")}
+              className="text-red-500 hover:text-red-800 shrink-0"
+            >
+              ✕
+            </button>
+
+          </div>
+
+        )}
+
+        {/* FILTER */}
+        <div className="flex flex-wrap gap-2 mb-8">
+
+          {[
+            "All",
+            "Pending",
+            "Preparing",
+            "Delivering",
+            "Completed",
+            "Cancelled"
+          ].map(status => {
+
+            const n =
+              status === "All"
+                ? orders.length
+                : orders.filter(
+                    o => o.status === status
+                  ).length;
+
+            return (
+
+              <button
+                key={status}
+                onClick={() => setFilter(status)}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+                  filter === status
+                    ? "bg-[#2d1e1e] text-white"
+                    : "bg-white border border-[#ddd] text-gray-600 hover:border-[#6b4f4f]"
+                }`}
+              >
+                {status} ({n})
+              </button>
+
+            );
+
+          })}
 
         </div>
 
         {/* EMPTY */}
-        {orders.length === 0 ? (
+        {visibleOrders.length === 0 ? (
 
           <div className="bg-white rounded-3xl shadow-sm border border-[#eee] p-16 text-center">
 
@@ -213,11 +427,19 @@ export default function OrderManagement({
             />
 
             <h2 className="text-2xl font-bold mb-2">
-              No Orders Yet
+              {
+                filter === "All"
+                  ? "No Orders Yet"
+                  : `No ${filter} orders`
+              }
             </h2>
 
             <p className="text-gray-500">
-              Incoming orders will appear here.
+              {
+                filter === "All"
+                  ? "Incoming orders will appear here."
+                  : "Try another status filter."
+              }
             </p>
 
           </div>
@@ -226,11 +448,17 @@ export default function OrderManagement({
 
           <div className="space-y-8">
 
-            {orders.map((order) => (
+            {visibleOrders.map((order) => (
 
                 <div
                   key={order._id}
-                  className="bg-white rounded-3xl shadow-sm border border-[#eee] overflow-hidden"
+                  className={`bg-white rounded-3xl shadow-sm border overflow-hidden transition ${
+                    order.status === "Cancelled"
+                      ? "border-red-200"
+                      : newIds.has(order._id)
+                        ? "border-amber-400 ring-2 ring-amber-200"
+                        : "border-[#eee]"
+                  }`}
                 >
 
                   {/* TOP */}
@@ -238,23 +466,80 @@ export default function OrderManagement({
 
                     <div>
 
-                      <p className="text-sm text-gray-500">
-                        Order ID
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+
+                        <p className="text-sm text-gray-500">
+                          Order ID
+                        </p>
+
+                        {newIds.has(order._id) && (
+
+                          <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                            New
+                          </span>
+
+                        )}
+
+                        {order.isReorder && (
+
+                          <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+
+                            <RotateCcw size={10} />
+
+                            Reorder
+
+                          </span>
+
+                        )}
+
+                      </div>
 
                       <h2 className="font-bold text-lg text-[#2d1e1e]">
                         #{order._id?.slice(-6).toUpperCase()}
                       </h2>
 
+                      <p className="text-xs text-gray-400 mt-1">
+                        {
+                          order.createdAt
+                            ? new Date(order.createdAt)
+                                .toLocaleString("vi-VN")
+                            : order.date
+                        }
+                      </p>
+
                     </div>
 
-                    <div
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold ${getStatusStyle(order.status)}`}
-                    >
+                    <div className="text-right">
 
-                      {getStatusIcon(order.status)}
+                      <div
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold ${getStatusStyle(order.status)}`}
+                      >
 
-                      {order.status}
+                        {getStatusIcon(order.status)}
+
+                        {order.status}
+
+                      </div>
+
+                      {order.status === "Cancelled" && (
+
+                        <p
+                          className={`text-xs mt-2 font-semibold ${
+                            order.cancelledBy === "admin"
+                              ? "text-gray-500"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {
+                            order.cancelledBy === "admin"
+                              ? "Cancelled by you (staff)"
+                              : order.cancelledBy === "customer"
+                                ? "Cancelled by customer"
+                                : "Cancelled"
+                          }
+                        </p>
+
+                      )}
 
                     </div>
 
@@ -303,13 +588,16 @@ export default function OrderManagement({
 
                     <select
                       value={order.status}
+                      disabled={
+                        updatingId === order._id
+                      }
                       onChange={(e) =>
                         updateStatus(
                           order._id,
                           e.target.value
                         )
                       }
-                      className="border border-[#ddd] px-4 py-3 rounded-xl bg-white"
+                      className="border border-[#ddd] px-4 py-3 rounded-xl bg-white disabled:opacity-60"
                     >
 
                       <option>Pending</option>

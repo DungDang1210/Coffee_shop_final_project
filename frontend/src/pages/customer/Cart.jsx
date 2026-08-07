@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
+import Navbar from "../../components/common/Navbar";
 
 export default function Cart({ cart, setCart }) {
   const navigate = useNavigate();

@@ -1,13 +1,18 @@
 import {
     ArrowDownCircle,
-    ArrowUpCircle,
-    Trash2
+    ArrowUpCircle
 } from "lucide-react";
 
 import { useEffect, useState } from "react";
 
 
-export default function StockHistory(){
+export default function StockHistory({
+
+    open,
+
+    onClose
+
+}){
 
     const [history,setHistory] = useState([]);
 
@@ -45,7 +50,11 @@ export default function StockHistory(){
 
     },[]);
 
+    if(!open){
 
+        return null;
+
+    }
 
     const filteredHistory = history.filter(item=>{
 
@@ -92,73 +101,83 @@ export default function StockHistory(){
     };
 
 
-
     return (
 
-<div>
+        <div className="
+        fixed
+        inset-0
+        bg-black/40
+        flex
+        justify-center
+        items-center
+        z-50
+        ">
+
+        <div className="
+        bg-white
+        w-[90%]
+        max-w-6xl
+        rounded-3xl
+        p-8
+        max-h-[90vh]
+        overflow-auto
+        ">
 
 
-    <div className="
+        <div className="
         flex
         justify-between
         items-center
         mb-6
-    ">
-
-
-        <h2 className="
-            text-2xl
-            font-bold
         ">
-            Stock History
-        </h2>
 
+            <h2 className="
+                text-2xl
+                font-bold
+            ">
+                Stock History
+            </h2>
 
+            <div className="flex gap-3">
+                
+                <select
+                    value={filter}
+                    onChange={(e)=>setFilter(e.target.value)}
+                    className="
+                    border
+                    rounded-xl
+                    px-4
+                    py-2
+                    "
+                >
+                    <option value="All">All</option>
+                    <option value="IMPORT">Import</option>
+                    <option value="EXPORT">Export</option>
+                </select>
 
-        <select
+                <button
+                    onClick={onClose}
+                    className="
+                    bg-red-500
+                    text-white
+                    px-4
+                    py-2
+                    rounded-xl
+                    hover:bg-red-600
+                    "
+                >
+                    Close
+                </button>
 
-            value={filter}
+            </div>
 
-            onChange={(e)=>
-                setFilter(e.target.value)
-            }
+        </div>
 
-            className="
-            border
-            rounded-xl
-            px-4
-            py-2
-            "
-
-        >
-
-            <option value="All">
-                All
-            </option>
-
-            <option value="IMPORT">
-                Import
-            </option>
-
-            <option value="EXPORT">
-                Export
-            </option>
-
-
-        </select>
-
-
-    </div>
-
-
-
-
-    <div className="
-        bg-white
-        rounded-3xl
-        shadow
-        overflow-hidden
-    ">
+        <div className="
+            rounded-3xl
+            shadow
+            overflow-hidden
+        ">
 
 
 <table className="w-full">
@@ -319,15 +338,13 @@ ${style.color}
 
 
 </table>
-
+</div>
 
 </div>
 
 
 </div>
-
 
     );
-
 
 }

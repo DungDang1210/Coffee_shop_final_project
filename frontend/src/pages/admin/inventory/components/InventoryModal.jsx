@@ -35,6 +35,50 @@ const units = [
     "bottle"
 ];
 
+const inputClass =
+    "border rounded-xl p-3 w-full outline-none focus:ring-2 focus:ring-[#6b4f4f]";
+
+
+// label + greyed hint, so a numeric box always
+// says what it is even once it has a value in it
+function Field({
+    label,
+    hint,
+    required,
+    children
+}){
+
+    return (
+
+        <div>
+
+            <label className="block text-sm font-semibold text-[#3a2c2a] mb-1">
+
+                {label}
+
+                {required && (
+                    <span className="text-red-500"> *</span>
+                )}
+
+            </label>
+
+            {children}
+
+            {hint && (
+
+                <p className="text-xs text-gray-400 mt-1">
+                    {hint}
+                </p>
+
+            )}
+
+        </div>
+
+    );
+
+}
+
+
 export default function InventoryModal({
 
     open,
@@ -113,11 +157,22 @@ editing
 
 <div className="grid grid-cols-2 gap-5">
 
+{/* Every field now carries a permanent label.
+    Placeholders alone disappeared the moment a
+    value was typed, so a row of bare numbers gave
+    the admin no idea what they meant. */}
+
+<Field
+label="Ingredient name"
+hint="What you order from the supplier"
+required
+>
+
 <input
 
-className="border rounded-xl p-3"
+className={inputClass}
 
-placeholder="Ingredient Name"
+placeholder="e.g. Arabica beans"
 
 value={form.name}
 
@@ -135,9 +190,16 @@ name:e.target.value
 
 />
 
+</Field>
+
+<Field
+label="Category"
+hint="Groups it in the inventory list"
+>
+
 <select
 
-className="border rounded-xl p-3"
+className={inputClass}
 
 value={form.category}
 
@@ -171,11 +233,18 @@ categories.map(item=>(
 
 </select>
 
+</Field>
+
+<Field
+label="Supplier"
+hint="Optional — who you buy it from"
+>
+
 <input
 
-className="border rounded-xl p-3"
+className={inputClass}
 
-placeholder="Supplier (optional)"
+placeholder="e.g. Đắk Lắk Farm"
 
 value={form.supplier}
 
@@ -193,9 +262,16 @@ supplier:e.target.value
 
 />
 
+</Field>
+
+<Field
+label="Unit"
+hint="How this ingredient is measured"
+>
+
 <select
 
-className="border rounded-xl p-3"
+className={inputClass}
 
 value={form.unit}
 
@@ -229,13 +305,22 @@ units.map(item=>(
 
 </select>
 
+</Field>
+
+<Field
+label={`Current stock${form.unit ? ` (${form.unit})` : ""}`}
+hint="How much you have on hand right now"
+>
+
 <input
 
 type="number"
 
-className="border rounded-xl p-3"
+min="0"
 
-placeholder="Initial Stock"
+className={inputClass}
+
+placeholder="0"
 
 value={form.stock}
 
@@ -253,13 +338,22 @@ stock:e.target.value
 
 />
 
+</Field>
+
+<Field
+label={`Minimum stock${form.unit ? ` (${form.unit})` : ""}`}
+hint="Drop to this level and it flags Low Stock"
+>
+
 <input
 
 type="number"
 
-className="border rounded-xl p-3"
+min="0"
 
-placeholder="Minimum Stock"
+className={inputClass}
+
+placeholder="5"
 
 value={form.minStock}
 
@@ -277,11 +371,19 @@ minStock:e.target.value
 
 />
 
+</Field>
+
+<Field
+label={`Cost price per ${form.unit || "unit"}`}
+hint="What you pay your supplier"
+>
+
 <div className="relative">
 
-<span className="absolute left-4 top-3 text-gray-400">
+{/* was "$" — the shop prices in dong */}
+<span className="absolute right-4 top-3 text-gray-400 pointer-events-none">
 
-$
+₫
 
 </span>
 
@@ -289,9 +391,11 @@ $
 
 type="number"
 
-className="border rounded-xl p-3 pl-8 w-full"
+min="0"
 
-placeholder="Cost Price"
+className={`${inputClass} pr-9`}
+
+placeholder="0"
 
 value={form.costPrice}
 
@@ -308,11 +412,28 @@ costPrice:e.target.value
 }
 
 />
+
 </div>
+
+{Number(form.costPrice) > 0 && (
+
+<p className="text-xs text-gray-500 mt-1">
+  = {Number(form.costPrice).toLocaleString("vi-VN")} ₫
+  {" per "}{form.unit || "unit"}
+</p>
+
+)}
+
+</Field>
+
+<Field
+label="Storage location"
+hint="Where it is kept"
+>
 
 <select
 
-className="border rounded-xl p-3"
+className={inputClass}
 
 value={form.location}
 
@@ -345,6 +466,8 @@ locations.map(item=>(
 }
 
 </select>
+
+</Field>
 
     <div className="col-span-2">
 

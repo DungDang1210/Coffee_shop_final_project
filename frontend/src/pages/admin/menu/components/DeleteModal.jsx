@@ -6,13 +6,18 @@ export default function DeleteModal({
 
     product,
 
+    deleting,
+
     onClose,
 
     onConfirm
 
 }) {
 
-    if (!open) return null;
+    // guard: without an id there is nothing to
+    // delete, and calling the API with `undefined`
+    // silently fails
+    if (!open || !product?._id) return null;
 
     return (
 
@@ -82,7 +87,9 @@ export default function DeleteModal({
 
                         onClick={onClose}
 
-                        className="px-6 py-3 rounded-xl border border-gray-300 hover:bg-gray-100"
+                        disabled={deleting}
+
+                        className="px-6 py-3 rounded-xl border border-gray-300 hover:bg-gray-100 disabled:opacity-50"
 
                     >
 
@@ -94,11 +101,13 @@ export default function DeleteModal({
 
                         onClick={() => onConfirm(product._id)}
 
-                        className="px-6 py-3 rounded-xl bg-red-600 text-white hover:bg-red-700"
+                        disabled={deleting}
+
+                        className="px-6 py-3 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed"
 
                     >
 
-                        Delete
+                        {deleting ? "Deleting..." : "Delete"}
 
                     </button>
 
